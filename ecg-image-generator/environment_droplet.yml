@@ -1,4 +1,4 @@
-name: ecg_gen
+name: ecg_image_gen
 channels:
   - defaults
 dependencies:
@@ -18,12 +18,10 @@ dependencies:
       - numpy==1.24.3
       - opencv_python==4.6.0.66
       - pandas==1.4.1
-      - qrcode==7.4.2
       - requests==2.21.0
       - scikit-image==0.20.0
       - scipy==1.9.1
       - seaborn==0.12.2
       - validators==0.18.2
-      - spacy>=3.0.8
-      - pyyaml
-      - https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_core_sci_sm-0.5.3.tar.gz
+      - spacy==3.0.8
+      - https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.4.0/en_core_sci_sm-0.4.0.tar.gz

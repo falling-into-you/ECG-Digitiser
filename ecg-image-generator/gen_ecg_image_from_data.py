@@ -59,7 +59,7 @@ def get_parser():
     parser.add_argument('--random_bw',type=float,default=0)
     parser.add_argument('--remove_lead_names',action="store_false",default=True)
     parser.add_argument('--lead_name_bbox',action="store_true",default=False)
-    parser.add_argument('--store_config', type=int, const=1, default=0)
+    parser.add_argument('--store_config', type=int, nargs='?', const=1, default=0)
 
     parser.add_argument('--deterministic_offset',action="store_true",default=False)
     parser.add_argument('--deterministic_num_words',action="store_true",default=False)
@@ -79,9 +79,9 @@ def get_parser():
     parser.add_argument('--wrinkles',action='store_true',default=False)
     parser.add_argument('--augment',action='store_true',default=False)
     parser.add_argument('--lead_bbox',action='store_true',default=False)
-
-    parser.add_argument('--num_images_per_ecg',type=int,default=None) 
     
+    parser.add_argument('--image_only',action='store_true',default=False, help='只生成PNG图像，不生成原始数据文件(.dat和.hea)')
+
     return parser
 
 def writeCSV(args):
@@ -102,7 +102,7 @@ def writeCSV(args):
 def run_single_file(args):
         if hasattr(args, 'st') == True:
             random.seed(args.seed)
-            qr_encoding = args.input_file
+            args.encoding = args.input_file
 
         filename = args.input_file
         header = args.header_file
@@ -132,12 +132,7 @@ def run_single_file(args):
 
         configs = read_config_file(os.path.join(os.getcwd(), args.config_file))
 
-        if args.num_images_per_ecg is not None:
-            out_array = []
-            for i in range(args.num_images_per_ecg):
-                out_array += get_paper_ecg(input_file=filename,header_file=header, configs=configs, mask_unplotted_samples=args.mask_unplotted_samples, start_index=args.start_index, store_configs=args.store_config, store_text_bbox=args.lead_name_bbox, output_directory=args.output_directory,resolution=resolution,papersize=papersize,add_lead_names=lead,add_dc_pulse=bernoulli_dc,add_bw=bernoulli_bw,show_grid=bernoulli_grid,add_print=bernoulli_add_print,pad_inches=padding,font_type=font,standard_colours=standard_colours,full_mode=args.full_mode,bbox = args.lead_bbox, columns = args.num_columns, seed=args.seed, num=i)
-        else:
-            out_array = get_paper_ecg(input_file=filename,header_file=header, configs=configs, mask_unplotted_samples=args.mask_unplotted_samples, start_index=args.start_index, store_configs=args.store_config, store_text_bbox=args.lead_name_bbox, output_directory=args.output_directory,resolution=resolution,papersize=papersize,add_lead_names=lead,add_dc_pulse=bernoulli_dc,add_bw=bernoulli_bw,show_grid=bernoulli_grid,add_print=bernoulli_add_print,pad_inches=padding,font_type=font,standard_colours=standard_colours,full_mode=args.full_mode,bbox = args.lead_bbox, columns = args.num_columns, seed=args.seed)
+        out_array = get_paper_ecg(input_file=filename,header_file=header, configs=configs, mask_unplotted_samples=args.mask_unplotted_samples, start_index=args.start_index, store_configs=args.store_config, store_text_bbox=args.lead_name_bbox, output_directory=args.output_directory,resolution=resolution,papersize=papersize,add_lead_names=lead,add_dc_pulse=bernoulli_dc,add_bw=bernoulli_bw,show_grid=bernoulli_grid,add_print=bernoulli_add_print,pad_inches=padding,font_type=font,standard_colours=standard_colours,full_mode=args.full_mode,bbox = args.lead_bbox, columns = args.num_columns, seed=args.seed, image_only=args.image_only)
         
         for out in out_array:
             if args.store_config:
@@ -151,18 +146,9 @@ def run_single_file(args):
                 wrinkles = random.choice((True,False))
                 augment = random.choice((True,False))
             else:
-                if args.hw_text:
-                    hw_text = random.choice((True,False))
-                else: 
-                    hw_text = False
-                if args.wrinkles:
-                    wrinkles = random.choice((True,False))
-                else:
-                    wrinkles = False
-                if args.augment:
-                    augment = random.choice((True,False))
-                else:
-                    augment = False
+                hw_text = args.hw_text
+                wrinkles = args.wrinkles
+                augment = args.augment
             
             #Handwritten text addition
             if(hw_text):
@@ -218,20 +204,18 @@ def run_single_file(args):
                 else:
                     temp = random.choice(range(10000,20000))
                 rotate = args.rotate
-                out, json_dict_aug = get_augment(out,output_directory=args.output_directory,rotate=args.rotate,noise=noise,crop=crop,temperature=temp,bbox = args.lead_bbox, store_text_bounding_box = args.lead_name_bbox, json_dict = json_dict)
-                if args.store_config == 2:
-                    json_dict.update(json_dict_aug)
+                out = get_augment(out,output_directory=args.output_directory,rotate=args.rotate,noise=noise,crop=crop,temperature=temp,bbox = args.lead_bbox, store_text_bounding_box = args.lead_name_bbox, json_dict = json_dict)
+            
             else:
                 crop = 0
                 temp = 0
                 rotate = 0
                 noise = 0
-                if args.store_config == 2:
-                    json_dict['crop'] = crop
-                    json_dict['rotate'] = rotate
             if args.store_config == 2:
                 json_dict['augment'] = bool(augment)
+                json_dict['crop'] = crop
                 json_dict['temperature'] = temp
+                json_dict['rotate'] = rotate
                 json_dict['noise'] = noise
 
             if args.store_config:
@@ -239,7 +223,8 @@ def run_single_file(args):
                 
                 with open(rec_tail + '.json', "w") as f:
                     f.write(json_object)
-                    
+
+
             if args.add_qr_code:
                 img = np.array(Image.open(out))
                 qr = qrcode.QRCode(
@@ -248,7 +233,7 @@ def run_single_file(args):
                     box_size=5,
                     border=4,
                 )
-                qr.add_data(qr_encoding)
+                qr.add_data(args.encoding)
                 qr.make(fit=True)
 
                 qr_img = np.array(qr.make_image(fill_color="black", back_color="white"))
@@ -256,11 +241,13 @@ def run_single_file(args):
                 qr_img_color[:,:,0] = qr_img*255.
                 qr_img_color[:,:,1] = qr_img*255.
                 qr_img_color[:,:,2] = qr_img*255.
-
+                
                 img[:qr_img.shape[0], -qr_img.shape[1]:, :3] = qr_img_color
                 img = Image.fromarray(img)
                 img.save(out)
 
+
+        return len(out_array)
 
 if __name__=='__main__':
     path = os.path.join(os.getcwd(), sys.argv[0])

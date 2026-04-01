@@ -1,0 +1,12 @@
+python gen_ecg_images_from_data_batch.py \
+    -i /data/jinjiarui/datasets/mimic-iv-ecg-diagnostic-electrocardiogram-matched-subset-1.0/files \
+    -o /data/jinjiarui/datasets/mimic-iv-ecg-images \
+    -se 10 \
+    --lead_name_bbox \
+    --lead_bbox \
+    --calibration_pulse 1.0 \
+    --num_columns 1 \
+    --full_mode None \
+    --store_config 0 \
+    --num_workers 64 \
+    --image_only

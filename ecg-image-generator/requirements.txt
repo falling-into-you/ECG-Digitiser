@@ -6,7 +6,6 @@ keras==2.14.0
 opencv_python==4.6.0.66
 pillow==10.3.0
 requests==2.21.0
-qrcode==7.4.2
 scikit-image==0.21.0
 scikit-learn==1.4.2
 scipy>=1.10.0
@@ -21,3 +20,5 @@ numpy==1.26.4
 pandas==2.2.2
 wfdb==4.1.2
 pyyaml
+qrcode==7.4.2
+tqdm

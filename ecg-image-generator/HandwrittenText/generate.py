@@ -140,9 +140,6 @@ def sample_text(sess, args_text, translation, force,bias,style=None):
 
 #Main function to add handwritten text to ecg
 def get_handwritten(link,num_words,input_file,output_dir,x_offset=0,y_offset=0,handwriting_size_factor=0.2,model_path=os.path.join(os.path.join('HandwrittenText','pretrained'), 'model-29'),text=None,style=None,bias=1.,force=False,animation=False,noinfo=True,save=None,bbox= False):
-    # Make temp folder
-    os.makedirs('HandwrittenText/temp', exist_ok=True)
-    
     #Use 'Agg' mode to prevent accumulation of figures
     matplotlib.use("Agg")
     filename = input_file
@@ -222,9 +219,8 @@ def get_handwritten(link,num_words,input_file,output_dir,x_offset=0,y_offset=0,h
             ax[i].set_aspect('equal')
             ax[i].set_axis_off()
             i=i+1
-        #Save the plot as HandwrittenText.png
-        temp_file_name = f"HandwrittenText/temp/HandwrittenText{random.randint(0,1000000)}.png"
-        fig.savefig(temp_file_name,dpi=1200)
+            #Save the plot as HandwrittenText.png
+        fig.savefig('HandwrittenText.png',dpi=1200)
         img_path = filename
         file_head,file_tail = os.path.splitext(filename)
         boxed_file = file_head + '-boxed' + file_tail
@@ -234,7 +230,7 @@ def get_handwritten(link,num_words,input_file,output_dir,x_offset=0,y_offset=0,h
         #Convert from RGBA to RGB
         img_ecg = img_ecg.convert('RGB')
         #Load the generated handwritten text image
-        img_handwritten = Image.open(temp_file_name)
+        img_handwritten = Image.open('HandwrittenText.png')
         #Convert the generated handwritten text image to RGB
         img_handwritten = img_handwritten.convert('RGB')
         #Resize the handwritten text image
@@ -265,6 +261,6 @@ def get_handwritten(link,num_words,input_file,output_dir,x_offset=0,y_offset=0,h
         plt.clf()
         plt.cla()
         
-        os.remove(temp_file_name)
+        os.remove('HandwrittenText.png')
         outfile = os.path.join(output_dir,tail)
         return outfile

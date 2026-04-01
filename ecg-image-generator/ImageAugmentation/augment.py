@@ -71,14 +71,12 @@ def get_augment(input_file,output_directory,rotate=25,noise=25,crop=0.01,tempera
     rotated_pixel_coordinates = rotate_points(plotted_pixels, [h/2, w/2], -rot)
 
     if bbox or store_text_bounding_box:
-        json_dict['leads_augmented'] = convert_bounding_boxes_to_dict(augmented_lead_bbs, augmented_leadName_bbs, lead_bbs_labels, startTime_bbs, endTime_bbs, rotated_pixel_coordinates)
+        json_dict['leads'] = convert_bounding_boxes_to_dict(augmented_lead_bbs, augmented_leadName_bbs, lead_bbs_labels, startTime_bbs, endTime_bbs, rotated_pixel_coordinates)
 
     head, tail = os.path.split(filename)
 
     f = os.path.join(output_directory,tail)
     plt.imsave(fname=f,arr=images_aug[0])
-        
-    json_dict.update({'rotate': rot, 'crop': crop_sample})
 
-    return f, json_dict
+    return f
 

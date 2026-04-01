@@ -16,7 +16,7 @@ from random import randint
 import random
 
 # Run script.
-def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,add_bw,show_grid, add_print, configs, mask_unplotted_samples = False, start_index = -1, store_configs=False, store_text_bbox=True,key='val',resolution=100,units='inches',papersize='',add_lead_names=True,pad_inches=1,template_file=os.path.join('TemplateFiles','TextFile1.txt'),font_type=os.path.join('Fonts','Times_New_Roman.ttf'),standard_colours=5,full_mode='II',bbox = False,columns=-1, num = None):
+def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,add_bw,show_grid, add_print, configs, mask_unplotted_samples = False, start_index = -1, store_configs=False, store_text_bbox=True,key='val',resolution=100,units='inches',papersize='',add_lead_names=True,pad_inches=1,template_file=os.path.join('TemplateFiles','TextFile1.txt'),font_type=os.path.join('Fonts','Times_New_Roman.ttf'),standard_colours=5,full_mode='II',bbox = False,columns=-1,image_only=False):
 
     # Extract a reduced-lead set from each pair of full-lead header and recording files.
     full_header_file = header_file
@@ -33,12 +33,17 @@ def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,ad
 
     head, tail = os.path.split(full_header_file)
 
-    output_header_file = os.path.join(output_directory, tail)
-    with open(output_header_file, 'w') as f:
-            f.write('\n'.join(full_lines))
+    # 只有在不是 image_only 模式时才写入 header 文件
+    if not image_only:
+        output_header_file = os.path.join(output_directory, tail)
+        with open(output_header_file, 'w') as f:
+                f.write('\n'.join(full_lines))
 
     #Load the full-lead recording file, extract the lead data, and save the reduced-lead recording file.
     recording = load_recording(full_recording_file, full_header,key)
+    
+    # Replace NaN and Inf with 0 to prevent OverflowError
+    recording = np.nan_to_num(recording, nan=0.0, posinf=0.0, neginf=0.0)
 
     # Get values from header
     rate = get_frequency(full_header)
@@ -46,7 +51,25 @@ def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,ad
     
     full_leads = standardize_leads(full_leads)
 
+    full_mode_input = full_mode
+    if full_mode_input is None:
+        full_mode_input = 'None'
+    if isinstance(full_mode_input, str):
+        full_mode_parts = [p.strip() for p in full_mode_input.split(',') if p.strip()]
+        if full_mode_input.strip() == 'None':
+            full_modes = []
+        else:
+            full_modes = standardize_leads(full_mode_parts).tolist() if full_mode_parts else []
+    else:
+        full_modes = standardize_leads(full_mode_input).tolist()
+
+    # Reverse the list so that the first lead in the input string is plotted at the top
+    # (assuming ecg_plot plots from bottom to top)
+    if len(full_modes) > 1:
+        full_modes.reverse()
+
     if(len(full_leads)==2):
+        full_modes = []
         full_mode = 'None'
         gen_m = 2
         if(columns==-1):
@@ -54,15 +77,17 @@ def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,ad
             
     elif(len(full_leads)==12):
         gen_m = 12
-        if full_mode not in full_leads:
-            full_mode = full_leads[0]
-        else:
-            full_mode = full_mode
+        if len(full_modes) > 0:
+            full_modes = [m for m in full_modes if m in full_leads]
+        if len(full_modes) == 0 and isinstance(full_mode_input, str) and full_mode_input.strip() != 'None':
+            full_modes = [full_leads[0]]
+        full_mode = full_modes[0] if len(full_modes) > 0 else 'None'
         if(columns==-1):
             columns = 4
     else:
         gen_m = len(full_leads)
         columns = 4
+        full_modes = []
         full_mode = 'None'
 
     template_name = 'custom_template.png'
@@ -80,8 +105,15 @@ def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,ad
     lead_length_in_seconds = configs['paper_len']/columns
     abs_lead_step = configs['abs_lead_step']
     format_4_by_3 = configs['format_4_by_3']
+    lead_to_col = None
+    if columns == 2 and len(full_leads) == 12 and 'leadNames_12' in configs:
+        lead_names_12 = configs['leadNames_12']
+        lead_names_12 = standardize_leads(lead_names_12).tolist()
+        lead_to_col = {lead_names_12[i]: (i % columns) for i in range(len(lead_names_12))}
     
     segmented_ecg_data = {}
+
+    full_mode_plot = full_modes if len(full_modes) > 0 else 'None'
 
     if start_index != -1:
         start = start_index
@@ -96,16 +128,16 @@ def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,ad
                     nanArray[:] = np.nan
                 else:
                     nanArray[:] = record_dict[key][start:]
-                if(full_mode!='None' and key==full_mode):
-                    if 'full'+full_mode not in segmented_ecg_data.keys():
-                        segmented_ecg_data['full'+full_mode] = nanArray.tolist()
+                if len(full_modes) > 0 and key in full_modes:
+                    full_key = 'full' + key
+                    if full_key not in segmented_ecg_data.keys():
+                        segmented_ecg_data[full_key] = nanArray.tolist()
                     else:
-                        segmented_ecg_data['full'+full_mode] = segmented_ecg_data['full'+full_mode] + nanArray.tolist()
-                if(key!='full'+full_mode):
-                    if key not in segmented_ecg_data.keys():
-                        segmented_ecg_data[key] = nanArray.tolist()
-                    else:
-                        segmented_ecg_data[key] = segmented_ecg_data[key] + nanArray.tolist()
+                        segmented_ecg_data[full_key] = segmented_ecg_data[full_key] + nanArray.tolist()
+                if key not in segmented_ecg_data.keys():
+                    segmented_ecg_data[key] = nanArray.tolist()
+                else:
+                    segmented_ecg_data[key] = segmented_ecg_data[key] + nanArray.tolist()
             else:
                 shiftedStart = start
                 if columns == 4 and key in format_4_by_3[1]:
@@ -114,49 +146,51 @@ def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,ad
                     shiftedStart = start + int(2*rate*lead_length_in_seconds)
                 elif columns == 4 and key in format_4_by_3[3]:
                     shiftedStart = start + int(3*rate*lead_length_in_seconds)
+                elif columns == 2 and lead_to_col is not None and lead_to_col.get(key, 0) == 1:
+                    shiftedStart = start + int(rate*lead_length_in_seconds)
                 end = shiftedStart + int(rate*lead_length_in_seconds)
 
-                if(key!='full'+full_mode):
-                    frame[key] = record_dict[key][shiftedStart:end]
-                    frame[key] = frame[key]
+                frame[key] = record_dict[key][shiftedStart:end]
+                frame[key] = frame[key]
                     
-                    nanArray = np.empty((int(shiftedStart - start)))
-                    if mask_unplotted_samples:
-                        nanArray[:] = np.nan
-                    else:
-                        nanArray[:] = record_dict[key][start: shiftedStart]
-                    if columns == 4 and key not in format_4_by_3[0]:
-                        if key not in segmented_ecg_data.keys():
-                            segmented_ecg_data[key] = nanArray.tolist()
-                        else:
-                            segmented_ecg_data[key] = segmented_ecg_data[key] + nanArray.tolist()
+                nanArray = np.empty((int(shiftedStart - start)))
+                if mask_unplotted_samples:
+                    nanArray[:] = np.nan
+                else:
+                    nanArray[:] = record_dict[key][start: shiftedStart]
+                if shiftedStart > start:
                     if key not in segmented_ecg_data.keys():
-                        segmented_ecg_data[key] = frame[key].tolist()
+                        segmented_ecg_data[key] = nanArray.tolist()
                     else:
-                        segmented_ecg_data[key] = segmented_ecg_data[key] + frame[key].tolist()
+                        segmented_ecg_data[key] = segmented_ecg_data[key] + nanArray.tolist()
+                if key not in segmented_ecg_data.keys():
+                    segmented_ecg_data[key] = frame[key].tolist()
+                else:
+                    segmented_ecg_data[key] = segmented_ecg_data[key] + frame[key].tolist()
 
-                    nanArray = np.empty((int(abs_lead_step*rate - (end - shiftedStart) - (shiftedStart - start))))
-                    nanArray_len = int(abs_lead_step*rate - (end - shiftedStart) - (shiftedStart - start))
-                    if mask_unplotted_samples:
-                        nanArray[:] = np.nan
-                    else:
-                        nanArray[:] = record_dict[key][end: end+nanArray_len]
-                    segmented_ecg_data[key] = segmented_ecg_data[key] + nanArray.tolist()
-                if(full_mode!='None' and key==full_mode):
+                nanArray = np.empty((int(abs_lead_step*rate - (end - shiftedStart) - (shiftedStart - start))))
+                nanArray_len = int(abs_lead_step*rate - (end - shiftedStart) - (shiftedStart - start))
+                if mask_unplotted_samples:
+                    nanArray[:] = np.nan
+                else:
+                    nanArray[:] = record_dict[key][end: end+nanArray_len]
+                segmented_ecg_data[key] = segmented_ecg_data[key] + nanArray.tolist()
+                if len(full_modes) > 0 and key in full_modes:
+                    full_key = 'full' + key
                     if(len(record_dict[key][start:])>int(rate*10)):
-                        frame['full'+full_mode] = record_dict[key][start:(start+int(rate)*10)]
-                        frame['full'+full_mode] = frame['full'+full_mode]
-                        if 'full'+full_mode not in segmented_ecg_data.keys():
-                            segmented_ecg_data['full'+full_mode] = frame['full'+full_mode].tolist()
+                        frame[full_key] = record_dict[key][start:(start+int(rate)*10)]
+                        frame[full_key] = frame[full_key]
+                        if full_key not in segmented_ecg_data.keys():
+                            segmented_ecg_data[full_key] = frame[full_key].tolist()
                         else:
-                            segmented_ecg_data['full'+full_mode] = segmented_ecg_data['full'+full_mode] + frame['full'+full_mode].tolist()
+                            segmented_ecg_data[full_key] = segmented_ecg_data[full_key] + frame[full_key].tolist()
                     else:
-                        frame['full'+full_mode] = record_dict[key][start:]
-                        frame['full'+full_mode] = frame['full'+full_mode]
-                        if 'full'+full_mode not in segmented_ecg_data.keys():
-                            segmented_ecg_data['full'+full_mode] = frame['full'+full_mode].tolist()
+                        frame[full_key] = record_dict[key][start:]
+                        frame[full_key] = frame[full_key]
+                        if full_key not in segmented_ecg_data.keys():
+                            segmented_ecg_data[full_key] = frame[full_key].tolist()
                         else:
-                            segmented_ecg_data['full'+full_mode] = segmented_ecg_data['full'+full_mode] + frame['full'+full_mode].tolist()
+                            segmented_ecg_data[full_key] = segmented_ecg_data[full_key] + frame[full_key].tolist()
                 gain_index += 1
         ecg_frame.append(frame)
 
@@ -175,16 +209,16 @@ def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,ad
                     else:
                         nanArray[:] = record_dict[key][start:]
 
-                    if(full_mode!='None' and key==full_mode):
-                        if 'full'+full_mode not in segmented_ecg_data.keys():
-                            segmented_ecg_data['full'+full_mode] = nanArray.tolist()
+                    if len(full_modes) > 0 and key in full_modes:
+                        full_key = 'full' + key
+                        if full_key not in segmented_ecg_data.keys():
+                            segmented_ecg_data[full_key] = nanArray.tolist()
                         else:
-                            segmented_ecg_data['full'+full_mode] = segmented_ecg_data['full'+full_mode] + nanArray.tolist()
-                    if(key!='full'+full_mode):
-                        if key not in segmented_ecg_data.keys():
-                            segmented_ecg_data[key] = nanArray.tolist()
-                        else:
-                            segmented_ecg_data[key] = segmented_ecg_data[key] + nanArray.tolist()
+                            segmented_ecg_data[full_key] = segmented_ecg_data[full_key] + nanArray.tolist()
+                    if key not in segmented_ecg_data.keys():
+                        segmented_ecg_data[key] = nanArray.tolist()
+                    else:
+                        segmented_ecg_data[key] = segmented_ecg_data[key] + nanArray.tolist()
                 else:
                     shiftedStart = start
                     if columns == 4 and key in format_4_by_3[1]:
@@ -193,59 +227,65 @@ def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,ad
                         shiftedStart = start + int(2*rate*lead_length_in_seconds)
                     elif columns == 4 and key in format_4_by_3[3]:
                         shiftedStart = start + int(3*rate*lead_length_in_seconds)
+                    elif columns == 2 and lead_to_col is not None and lead_to_col.get(key, 0) == 1:
+                        shiftedStart = start + int(rate*lead_length_in_seconds)
                     end = shiftedStart + int(rate*lead_length_in_seconds)
                     
-                    if(key!='full'+full_mode):
-                        frame[key] = record_dict[key][shiftedStart:end]
-                        frame[key] = frame[key]
+                    frame[key] = record_dict[key][shiftedStart:end]
+                    frame[key] = frame[key]
                         
-                        nanArray = np.empty((int(shiftedStart - start)))
-                        if mask_unplotted_samples:
-                            nanArray[:] = np.nan
-                        else:
-                            nanArray[:] = record_dict[key][start: shiftedStart]
+                    nanArray = np.empty((int(shiftedStart - start)))
+                    if mask_unplotted_samples:
+                        nanArray[:] = np.nan
+                    else:
+                        nanArray[:] = record_dict[key][start: shiftedStart]
 
-                        if columns == 4 and key not in format_4_by_3[0]:
-                            if key not in segmented_ecg_data.keys():
-                                segmented_ecg_data[key] = nanArray.tolist()
-                            else:
-                                segmented_ecg_data[key] = segmented_ecg_data[key] + nanArray.tolist()
+                    if shiftedStart > start:
                         if key not in segmented_ecg_data.keys():
-                            segmented_ecg_data[key] = frame[key].tolist()
+                            segmented_ecg_data[key] = nanArray.tolist()
                         else:
-                            segmented_ecg_data[key] = segmented_ecg_data[key] + frame[key].tolist()
+                            segmented_ecg_data[key] = segmented_ecg_data[key] + nanArray.tolist()
+                    if key not in segmented_ecg_data.keys():
+                        segmented_ecg_data[key] = frame[key].tolist()
+                    else:
+                        segmented_ecg_data[key] = segmented_ecg_data[key] + frame[key].tolist()
 
-                        nanArray = np.empty((int(abs_lead_step*rate - (end - shiftedStart) - (shiftedStart - start))))
-                        nanArray_len = int(abs_lead_step*rate - (end - shiftedStart) - (shiftedStart - start))
-                        if mask_unplotted_samples:
-                            nanArray[:] = np.nan
-                        else:
-                            nanArray[:] = record_dict[key][end: end+nanArray_len]
+                    nanArray = np.empty((int(abs_lead_step*rate - (end - shiftedStart) - (shiftedStart - start))))
+                    nanArray_len = int(abs_lead_step*rate - (end - shiftedStart) - (shiftedStart - start))
+                    if mask_unplotted_samples:
+                        nanArray[:] = np.nan
+                    else:
+                        nanArray[:] = record_dict[key][end: end+nanArray_len]
 
-                        segmented_ecg_data[key] = segmented_ecg_data[key] + nanArray.tolist()
-                    if(full_mode!='None' and key==full_mode):
+                    segmented_ecg_data[key] = segmented_ecg_data[key] + nanArray.tolist()
+                    if len(full_modes) > 0 and key in full_modes:
+                        full_key = 'full' + key
                         if(len(record_dict[key][start:])>int(rate*10)):
-                            frame['full'+full_mode] = record_dict[key][start:(start+int(rate)*10)]
-                            frame['full'+full_mode] = frame['full'+full_mode]
-                            if 'full'+full_mode not in segmented_ecg_data.keys():
-                                segmented_ecg_data['full'+full_mode] = frame['full'+full_mode].tolist()
+                            frame[full_key] = record_dict[key][start:(start+int(rate)*10)]
+                            frame[full_key] = frame[full_key]
+                            if full_key not in segmented_ecg_data.keys():
+                                segmented_ecg_data[full_key] = frame[full_key].tolist()
                             else:
-                                segmented_ecg_data['full'+full_mode] = segmented_ecg_data['full'+full_mode] + frame['full'+full_mode].tolist()
+                                segmented_ecg_data[full_key] = segmented_ecg_data[full_key] + frame[full_key].tolist()
                         else:
-                            frame['full'+full_mode] = record_dict[key][start:]
-                            frame['full'+full_mode] = frame['full'+full_mode]
-                            if 'full'+full_mode not in segmented_ecg_data.keys():
-                                segmented_ecg_data['full'+full_mode] = frame['full'+full_mode].tolist()
+                            frame[full_key] = record_dict[key][start:]
+                            frame[full_key] = frame[full_key]
+                            if full_key not in segmented_ecg_data.keys():
+                                segmented_ecg_data[full_key] = frame[full_key].tolist()
                             else:
-                                segmented_ecg_data['full'+full_mode] = segmented_ecg_data['full'+full_mode] + frame['full'+full_mode].tolist()
+                                segmented_ecg_data[full_key] = segmented_ecg_data[full_key] + frame[full_key].tolist()
                     gain_index += 1
             if(end_flag==False):
                 ecg_frame.append(frame)
                 start = start + int(rate*abs_lead_step)
     outfile_array = []
     
+    # 提取文件名（PNG 生成需要使用）
     name, ext = os.path.splitext(full_header_file)
-    write_wfdb_file(segmented_ecg_data, name, rate, header_file, output_directory, full_mode, mask_unplotted_samples)
+    
+    # 只有在不是 image_only 模式时才写入 WFDB 数据文件
+    if not image_only:
+        write_wfdb_file(segmented_ecg_data, name, rate, header_file, output_directory, full_mode, mask_unplotted_samples)
 
     if len(ecg_frame) == 0:
         return outfile_array
@@ -263,14 +303,11 @@ def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,ad
         if(bw):
             grid_colour = 'bw'
 
-        if num is not None:
-            rec_file = name + '-' + str(num) + '-' + str(i) + '_0000'
-        else:
-            rec_file = name + '-' + str(i) + '_0000'
+        rec_file = name + '-' + str(i)
         if ecg_frame[i] == {}:
             continue
 
-        x_grid,y_grid = ecg_plot(ecg_frame[i], configs=configs, full_header_file=full_header_file, style=grid_colour, sample_rate = rate,columns=columns,rec_file_name = rec_file, output_dir = output_directory, resolution = resolution, pad_inches = pad_inches, lead_index=full_leads, full_mode = full_mode, store_text_bbox = store_text_bbox, show_lead_name=add_lead_names,show_dc_pulse=dc,papersize=papersize,show_grid=(grid),standard_colours=standard_colours,bbox=bbox, print_txt=print_txt, json_dict=json_dict, start_index=start, store_configs=store_configs, lead_length_in_seconds=lead_length_in_seconds)
+        x_grid,y_grid = ecg_plot(ecg_frame[i], configs=configs, full_header_file=full_header_file, style=grid_colour, sample_rate = rate,columns=columns,rec_file_name = rec_file, output_dir = output_directory, resolution = resolution, pad_inches = pad_inches, lead_index=full_leads, full_mode = full_mode_plot, store_text_bbox = store_text_bbox, show_lead_name=add_lead_names,show_dc_pulse=dc,papersize=papersize,show_grid=(grid),standard_colours=standard_colours,bbox=bbox, print_txt=print_txt, json_dict=json_dict, start_index=start, store_configs=store_configs, lead_length_in_seconds=lead_length_in_seconds)
 
         rec_head, rec_tail = os.path.split(rec_file)
         
@@ -285,7 +322,7 @@ def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,ad
             json_dict["gridlines"] = bool(grid)
             json_dict["printed_text"] = bool(print_txt)
             json_dict["number_of_columns_in_image"] = columns
-            json_dict["full_mode_lead"] =full_mode
+            json_dict["full_mode_lead"] = full_mode_plot
 
         outfile = os.path.join(output_directory,rec_tail+'.png')
 

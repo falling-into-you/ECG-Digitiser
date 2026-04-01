@@ -1,0 +1,13 @@
+python gen_ecg_images_from_jsonl.py \
+    --jsonl_file /data/jinjiarui/datasets/ECG_R1_Dataset/ecg_jsons/ECG_Grounding/ECG_R1_ecg-grounding_test_ptbxl.jsonl \
+    -i /data/jinjiarui/datasets \
+    -o /data/jinjiarui/datasets/ECG_R1_Dataset/ecg_images/gen_images \
+    -se 10 \
+    --lead_name_bbox \
+    --lead_bbox \
+    --calibration_pulse 1.0 \
+    --num_columns 1 \
+    --full_mode None \
+    --store_config 0 \
+    --num_workers 64 \
+    --image_only \

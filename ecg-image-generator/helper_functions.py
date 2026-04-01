@@ -6,6 +6,7 @@ from matplotlib.ticker import AutoMinorLocator
 from math import ceil 
 import wfdb
 from imgaug import augmenters as iaa
+from tqdm import tqdm
 
 BIT_NAN_16 = -(2.**15)
 
@@ -31,20 +32,32 @@ def find_records(folder, output_dir):
     header_files = list()
     recording_files = list()
 
-    for root, directories, files in os.walk(folder):
-        files = sorted(files)
-        for file in files:
-            extension = os.path.splitext(file)[1]
-            if extension == '.mat':
-                record = os.path.relpath(os.path.join(root, file.split('.')[0] + '.mat'), folder)
-                hd = os.path.relpath(os.path.join(root, file.split('.')[0] + '.hea'), folder)
-                recording_files.append(record)
-                header_files.append(hd)
-            if extension == '.dat':
-                record = os.path.relpath(os.path.join(root, file.split('.')[0] + '.dat'), folder)
-                hd = os.path.relpath(os.path.join(root, file.split('.')[0] + '.hea'), folder)
-                header_files.append(hd)
-                recording_files.append(record)
+    pbar = tqdm(
+        total=None,
+        desc="扫描输入目录",
+        unit="个文件",
+        dynamic_ncols=True,
+        leave=False,
+        disable=False,
+    )
+    try:
+        for root, directories, files in os.walk(folder):
+            files = sorted(files)
+            for file in files:
+                pbar.update(1)
+                extension = os.path.splitext(file)[1]
+                if extension == '.mat':
+                    record = os.path.relpath(os.path.join(root, file.split('.')[0] + '.mat'), folder)
+                    hd = os.path.relpath(os.path.join(root, file.split('.')[0] + '.hea'), folder)
+                    recording_files.append(record)
+                    header_files.append(hd)
+                if extension == '.dat':
+                    record = os.path.relpath(os.path.join(root, file.split('.')[0] + '.dat'), folder)
+                    hd = os.path.relpath(os.path.join(root, file.split('.')[0] + '.hea'), folder)
+                    header_files.append(hd)
+                    recording_files.append(record)
+    finally:
+        pbar.close()
     
     if recording_files == []:
         raise Exception("The input directory does not have any WFDB compatible ECG files, please re-check the folder!")
@@ -65,50 +78,57 @@ def find_files(data_directory):
     header_files = list()
     recording_files = list()
 
-    for f in sorted(os.listdir(data_directory)):
+    pbar = tqdm(
+        total=None,
+        desc="扫描输入目录",
+        unit="个文件",
+        dynamic_ncols=True,
+        leave=False,
+        disable=False,
+    )
+    try:
+        for f in sorted(os.listdir(data_directory)):
+            pbar.update(1)
+            if(os.path.isdir(os.path.join(data_directory, f))):
+                for file in sorted(os.listdir(os.path.join(data_directory,f))):
+                    pbar.update(1)
+                    root, extension = os.path.splitext(file)
+                    
+                    if not root.startswith('.'):
+                        if extension=='.mat':
+                            header_file = os.path.join(os.path.join(data_directory,f), root + '.hea')
+                            recording_file = os.path.join(os.path.join(data_directory,f), root + '.mat')
 
-        if(os.path.isdir(os.path.join(data_directory, f))):
-            
-            for file in sorted(os.listdir(os.path.join(data_directory,f))):
-                root, extension = os.path.splitext(file)
-                
+                            if os.path.isfile(header_file) and os.path.isfile(recording_file):
+                                header_files.append(header_file)
+                                recording_files.append(recording_file)
+
+                        if extension=='.dat':
+                            header_file = os.path.join(os.path.join(data_directory,f), root + '.hea')
+                            recording_file = os.path.join(os.path.join(data_directory,f), root + '.dat')
+
+                            if os.path.isfile(header_file) and os.path.isfile(recording_file):
+                                header_files.append(header_file)
+                                recording_files.append(recording_file)
+            else:
+                root, extension = os.path.splitext(f)
+
                 if not root.startswith('.'):
-
                     if extension=='.mat':
-                        header_file = os.path.join(os.path.join(data_directory,f), root + '.hea')
-                        recording_file = os.path.join(os.path.join(data_directory,f), root + '.mat')
-
+                        header_file = os.path.join(data_directory, root + '.hea')
+                        recording_file = os.path.join(data_directory, root + '.mat')
                         if os.path.isfile(header_file) and os.path.isfile(recording_file):
                             header_files.append(header_file)
                             recording_files.append(recording_file)
 
                     if extension=='.dat':
-                        header_file = os.path.join(os.path.join(data_directory,f), root + '.hea')
-                        recording_file = os.path.join(os.path.join(data_directory,f), root + '.dat')
-
+                        header_file = os.path.join(data_directory, root + '.hea')
+                        recording_file = os.path.join(data_directory, root + '.dat')
                         if os.path.isfile(header_file) and os.path.isfile(recording_file):
                             header_files.append(header_file)
                             recording_files.append(recording_file)
-                            
-        else:
-
-            root, extension = os.path.splitext(f)
-
-            if not root.startswith('.'):
-                #Based on the recording format, we save the file names differently
-                if extension=='.mat':
-                    header_file = os.path.join(data_directory, root + '.hea')
-                    recording_file = os.path.join(data_directory, root + '.mat')
-                    if os.path.isfile(header_file) and os.path.isfile(recording_file):
-                        header_files.append(header_file)
-                        recording_files.append(recording_file)
-
-                if extension=='.dat':
-                    header_file = os.path.join(data_directory, root + '.hea')
-                    recording_file = os.path.join(data_directory, root + '.dat')
-                    if os.path.isfile(header_file) and os.path.isfile(recording_file):
-                        header_files.append(header_file)
-                        recording_files.append(recording_file)
+    finally:
+        pbar.close()
 
     return header_files, recording_files
 

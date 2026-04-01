@@ -12,7 +12,7 @@ The process of scanning and digitizing ECG images is governed by some fundamenta
 - Setup with Conda env: 
      ```
      conda env create -f environment_droplet.yml
-     conda activate ecg_gen
+     conda activate myenv
      ```
 
 - Set up with pip:
@@ -23,7 +23,7 @@ The process of scanning and digitizing ECG images is governed by some fundamenta
      2. If you will be using the handwritten text distortions feature, install [sciSpacy](https://github.com/allenai/scispacy) with the following command:
 
           ```
-          pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_core_sci_sm-0.5.3.tar.gz
+          pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.0/en_core_sci_sm-0.5.0.tar.gz
           ```
           
           Note that the requirements file has been compiled for python versions >= 3.9 and < 3.11
@@ -42,6 +42,13 @@ The process of scanning and digitizing ECG images is governed by some fundamenta
     * **ECG header and data files:** New header and data files for each image that is generated. Note that if an input ECG file is generating multiple images, the code outputs only one header and data file. The header and data file might be different from the corresponding files, based on the input parameters. For eg:  If `--mask_unplotted_samples` is set, the unplotted samples are masked with Nan. See the section on `Generating distortionless images` for more details on the input parameters.
     * **Config JSON file (optional):** A JSON file detailing several parameters used to generate images, box, text and image annotations. See below for more details.
 
+- Below are sample synthetic ECG images generated from sample records of the [PhysioNet PTB-XL](https://physionet.org/content/ptb-xl/) dataset.
+
+     |                           |                             |
+     | ----------------------------------- | ----------------------------------- |
+     | ![Sythentic ECG image](SampleData/PTB_XL_op/00002_hr-0.png) | ![GT Image](SampleData/PTB_XL_op/00003_hr-0.png) |
+
+     *Note:* The ECG images generated for the format 3 by 4 (4 columns), the ECG signals for every column have been sampled in a shifted fashion, i.e. the leads in the first column (I, II, III) is from the first 2.5 seconds, the second column (aVR, aVL, aVF) is from the second 2.5 seconds, the third column (V1, V2, V3) is from the third 2.5 seconds segment and the fourth column (V4, V5, V6) is from the fourth 2.5 seconds segment of the respective lead of the ECG signal.
 
 ## Generating distortionless ECG
 The basic mode of the tool creates ECG images without distortions. The mode of operation and generated outputs can be configured using these command-line flags:
@@ -58,7 +65,7 @@ The basic mode of the tool creates ECG images without distortions. The mode of o
 -   `--remove_lead_names`: Remove lead names from all generated images, default=False.
 - `--random_resolution`: Generate random resolutions of images, if True resolution is randomly picked from the range [50, `r`] else every image is generated at the `-r` resolution; default: False
 - `--random_padding`: Generate random padding widths on images, if True pad inches is randomly picked from the range [0, `--pad_inches`], else every image is padded with `--pad_inches`; default: False
-- `--calibration_pulse`: Add ECG calibration pulse to a random number of generated images. The parameter is the probability of the images having the calibration pulse; type: Float, default: 1 (no calibration pulse). Set to 1 to add the pulse to all images. Make sure that `--calibration_pulse` $\in$ [0, 1]. 
+- `--calibration_pulse`: Add ECG calibration pulse to a random number of generated images. The parameter is the probability of the images having the calibration pulse; type: Float, default: 1 (calibration pulse on all the images). Set to 1 to add the pulse to all images. Make sure that `--calibration_pulse` $\in$ [0, 1]. 
 - `--random_grid_present`: Probability of the generated images having the ECG paper grid; type: Float, default: 1 (adds the grid to all images). Make sure that `--random_grid_present` $\in$ [0, 1]. When 0, the images do not have the background grid.
 - `--random_print_header`: Probability of adding printed text to a random set of images; type: Float, default: 0 (no text added). Make sure that `--random_print_header` $\in$ [0, 1]. If `--print_header` is True, code prints text on all the images regardless of the `--random_print_header` attribute.
 - `--random_bw`: Make random set of images black and white controlled by this parameter; type: Float, default: 0 (generates colored ECG). Make sure that `--random_bw` $\in$ [0, 1].
@@ -66,11 +73,7 @@ The basic mode of the tool creates ECG images without distortions. The mode of o
 - `--random_grid_color`: Generates random colors for the gridlines, If `'--random_bw` > 0, then the color of gridlines for the non black and white ECG images is picked randomly. Default: False.
 - `--store_config`: Store config information for each image in a json file, type = int, Default: 0, constant value: 1, If `--store_config` is set to 1, the config file has high level attributes, refer template1.json. If  `--store_config` is set to 2, config file will have more detailed information, refer template2.json.
 - `--lead_name_bbox`: Store bounding box coordinates for the lead names in the json file under the attribute `text_bounding_box` in the config JSON file generated for every record (conditional); Add `--store_config` parameter to the command you are running. Note: Add `--store_config` parameter to the command you are running to save the config file with bounding box information. 
-- `--lead_bbox`:  Store bounding box coordinates for every individual ECG lead signal in the json file under the attribute `lead_bounding_box` in the config JSON file generated for every record (conditional). Note: Add `--store_config` parameter to the command you are running to save the config file with bounding box information.
-- `--num_images_per_ecg`: Number of images to be generated per ECG record; default: 1; type: int
-- `--run_in_parallel`: Run the code in parallel mode; default: False
-- `--num_workers`: Number of workers to run the code in parallel mode; default: -1 (all minus 2); type: int
-- `--fully_random`: Set `hw_text`, `wrinkles` and `augment` randomly for each image; default: False
+- `--lead_bbox`:  Store bounding box coordinates for every individual ECG lead signal in the json file under the attribute `lead_bounding_box` in the config JSON file generated for every record (conditional). Note: Add `--store_config` parameter to the command you are running to save the config file with bounding box information. 
 
      **Example:** 
      ```bash
@@ -101,6 +104,15 @@ The basic mode of the tool creates ECG images without distortions. The mode of o
      python gen_ecg_images_from_data_batch.py -i my_input_dir -o my_output_dir --hw_text -n 4 --x_offset 30 --y_offset 20 -se 10 --random_grid_color --add_qr_code
      ```
 
+     - Below are sample synthetic ECG images with handwritten text generated from sample records of the [PhysioNet PTB-XL](https://physionet.org/content/ptb-xl/) dataset using the script above.
+
+     |                            |                             |
+     | ----------------------------------- | ----------------------------------- |
+     | ![12 lead Image with handwritten text](SampleData/DistortionData/HandwrittenText/00004_hr-0.png) | ![2 lead Image with handwritten text](SampleData/DistortionData/HandwrittenText/00002_hr-0.png) |
+
+
+     Adding text artifacts is a computationally expensive process and should be run with GPU machines for large scale dataset generation.
+
 - ### Wrinkles and creases
      Creases are simulated using Gaussian-blurred lines, evenly spaced to mimic paper fold creases. Gaussian blurring, a common image augmentation technique for smoothing effects, is applied to these lines. This blurring enhances realism by creating a shadow effect in the creases, common in scanned images or real paper ECG. For wrinkles, which are essentially textures, advanced texture synthesis methods like image quilting are used.
 
@@ -121,6 +133,9 @@ The basic mode of the tool creates ECG images without distortions. The mode of o
 
      - Wrinkle and creases distortion on synthetic images generated from the [PhysioNet PTB-XL](https://physionet.org/content/ptb-xl/)
 
+     |                            |                             |
+     | ----------------------------------- | ----------------------------------- |
+     | ![12 lead Image with handwritten text](SampleData/DistortionData/Wrinkles_Creases/00003_hr-0.png) | ![2 lead Image with handwritten text](SampleData/DistortionData/Wrinkles_Creases/00001_hr-0.png) |
 
 - ### Augmentation and noise
      Add `--augment` to the python command to add augmentations to the images. Furthermore following attributes specific to the wrinkles can be adjusted: 
@@ -142,10 +157,18 @@ The basic mode of the tool creates ECG images without distortions. The mode of o
 
      - Augmentation on synthetic images generated from the [PhysioNet PTB-XL](https://physionet.org/content/ptb-xl/)
 
+     |                            |                             |
+     | ----------------------------------- | ----------------------------------- |
+     | ![12 lead Image with handwritten text](SampleData/DistortionData/Augmentation/00002_hr-0.png) | ![2 lead Image with handwritten text](SampleData/DistortionData/Augmentation/00004_hr-0.png) |
+
      ### Adding Rotation and Crop Augmentation 
      ```bash
      python gen_ecg_images_from_data_batch.py -i my_input_dir -o my_output_dir --augment -rot 30 -c 0.1 --deterministic_rot --deterministic_noise -se 10
      ```
+
+     |                            |                             |
+     | ----------------------------------- | ----------------------------------- |
+     | ![12 lead Image with handwritten text](SampleData/DistortionData/Augmentation/00001_hr-0.png) | ![2 lead Image with handwritten text](SampleData/DistortionData/Augmentation/00006_hr-0.png) |
 
 
 - ### Adding all the distortions together:
@@ -153,17 +176,31 @@ The basic mode of the tool creates ECG images without distortions. The mode of o
      **Example:**
 
      ```bash
-     python gen_ecg_images_from_data_batch.py -i my_input_dir -o my_output_dir --augment -rot 5 -noise 40 --deterministic_rot --deterministic_noise --hw_text -n 4 --x_offset 30 --y_offset 20 --wrinkles -ca 45 -se 10 --print_header
+     python gen_ecg_images_from_data_batch.py -i my_input_dir -o my_output_dir --augment -rot 5 -noise 40 --deterministic_rot --deterministic_noise --hw_text -n 4 --x_offset 30 --y_offset 20 --wrinkles -ca 45 -se 10 --print_header --add_qr_code
      ```
 
      - All distortions on synthetic images generated from the [PhysioNet PTB-XL](https://physionet.org/content/ptb-xl/)
 
+     |                            |                             |
+     | ----------------------------------- | ----------------------------------- |
+     | ![12 lead Image with handwritten text](SampleData/DistortionData/00002_hr-0.png) | ![2 lead Image with handwritten text](SampleData/DistortionData/00003_hr-0.png) |
 
      **Example:**
 
      ```
      python gen_ecg_images_from_data_batch.py -i <input_dir> -o <output_dir> --random_add_header 0.8 -se 20 --lead_name_bbox  --resolution 300 --random_padding --pad_inches 1 --lead_bbox --augment -rot 5 -noise 40 --deterministic_rot --deterministic_noise --hw_text -n 4 --x_offset 30 --y_offset 20 --wrinkles -ca 45 
      ```
+
+     |                            |                             |
+     | ----------------------------------- | ----------------------------------- |
+     | ![12 lead Image with handwritten text](SampleData/DistortionData/bbox/00002_hr-0.png) | ![2 lead Image with handwritten text](SampleData/DistortionData/bbox/00003_hr-0.png) |
+
+     ### Distortionless images with Bounding box annotations
+     |                           |                             |
+     | ----------------------------------- | ----------------------------------- |
+     | ![Sythentic ECG image](SampleData/PTB_XL_op/box_plots/00002_hr-0.png) | ![GT Image](SampleData/PTB_XL_op/box_plots/00003_hr-0.png) |
+
+     *Note*: The red and green boxes here have been plotted from the corresponding text files for each lead and lead-name text.
 
 ## Generating image from a single ECG record
 - To provide more flexibility, we also allow users to generate synthetic ECG image from a single ECG record from a give index. The start index should be in the range: [0, len(signal))

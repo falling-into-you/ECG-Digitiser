@@ -77,10 +77,11 @@ def generate_template(header_file):
             attributes['DOB'] = 'Age: ' + attributes['Age'] + ' yrs'
 
         if attributes['Weight'] != '':
-            attributes['Weight'] = 'Weight: ' + attributes['Weight'] + ' Kgs'
-        
-        attributes['Height'] = 'Height: ' + attributes['Height']
-        
+            attributes['Weight'] = 'Weight: ' + attributes['Weight'] + ' kg'
+
+        if attributes['Height'] != '':
+            attributes['Height'] = 'Height: ' + attributes['Height'] + ' cm'
+
         attributes['Date'] = str(attributes['Date'])
         attributes['Date'] = 'Date: '+  attributes['Date'] + ', ' + attributes['Time']
         attributes['Sex'] = 'Sex: ' + attributes['Sex']
