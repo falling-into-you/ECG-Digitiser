@@ -12,7 +12,7 @@ IMAGE_DIR="<生成图像目录，如 /data/ecg_images/12x1_clean>"
 OUTPUT_DIR="<nnUNet数据集输出路径，如 /data/nnUNet_raw/Dataset500_Signals>"
 SPLIT_CSV=""  # 可选，train/val/test 划分用的 CSV，留空则不划分
 NUM_WORKERS=64
-RESAMPLE_FACTOR=3  # 像素插值倍数，低分辨率(100DPI)用3，高分辨率(200+DPI)用5-10
+RESAMPLE_FACTOR=2  # 像素插值倍数
 # =============================================
 
 echo "============================="
