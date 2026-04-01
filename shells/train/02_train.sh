@@ -13,7 +13,8 @@ export nnUNet_results="<训练结果路径>"
 DATASET_ID=500
 FOLD=0              # 0-9 为 10 折中某一折，all 为全量训练
 DEVICE=cuda         # cuda / cpu / mps
-NUM_GPUS=1          # 多 GPU 数量
+NUM_GPUS=4          # 多 GPU 数量
+export CUDA_VISIBLE_DEVICES=4,5,6,7  # 指定可见 GPU
 
 # ============ 模型超参（修改 nnUNetTrainer 源码）============
 # 以下参数位于 nnUNet/nnunetv2/training/nnUNetTrainer/nnUNetTrainer.py
