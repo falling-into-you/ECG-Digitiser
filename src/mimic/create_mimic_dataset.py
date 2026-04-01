@@ -21,6 +21,7 @@ import sys
 import pandas as pd
 from PIL import Image
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from src.utils.helper_code import *
 from config import LEAD_LABEL_MAPPING
@@ -150,14 +151,24 @@ def convert_images_parallel(
         workers = num_workers
     print(f"Using {workers}/{os.cpu_count()} workers")
 
-    for file_path, original_path in tqdm(
-        zip(file_paths, original_folder_path), total=len(file_paths)
-    ):
+    def _convert(f):
         try:
-            convert_images(file_path, rgba_to_rgb, rotate_image, original_path)
+            convert_images(f, rgba_to_rgb, rotate_image, None)
+            return True
         except Exception as e:
-            print(f"Error converting image {file_path}: {e}")
-            continue
+            return str(f)
+
+    errors = 0
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(_convert, f): f for f in file_paths}
+        for future in tqdm(as_completed(futures), total=len(futures), mininterval=1.0):
+            result = future.result()
+            if result is not True:
+                errors += 1
+                if errors <= 10:
+                    print(f"Error converting image {result}")
+    if errors > 10:
+        print(f"... 共 {errors} 个文件转换失败")
 
 
 # Function to create mask from json
@@ -248,14 +259,25 @@ def create_mask_from_json_parallel(
         workers = num_workers
     print(f"Using {workers}/{os.cpu_count()} workers")
 
-    for json_path, mask_path in tqdm(zip(json_paths, mask_paths), total=len(json_paths)):
+    def _process(args):
+        json_path, mask_path = args
         try:
-            create_mask_from_json(
-                json_path, mask_path, rgb, multilabel, plotted_pixels_key
-            )
+            create_mask_from_json(json_path, mask_path, rgb, multilabel, plotted_pixels_key)
+            return True
         except Exception as e:
-            print(f"Error creating mask for {json_path}: {e}")
-            continue
+            return f"Error creating mask for {json_path}: {e}"
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(_process, pair): pair for pair in zip(json_paths, mask_paths)}
+        errors = 0
+        for future in tqdm(as_completed(futures), total=len(futures), mininterval=1.0):
+            result = future.result()
+            if result is not True:
+                errors += 1
+                if errors <= 10:
+                    print(result)
+        if errors > 10:
+            print(f"... 共 {errors} 个 mask 创建失败")
 
 
 # Run the code.
@@ -357,20 +379,16 @@ def run(args):
     if args.mask:
         for folder in ["imagesTr", "imagesTv", "imagesTs"]:
             print(f"Creating masks for {folder}...")
-            file_options = [
-                f"{f.split('/')[-1].split('_hr')[0]}_hr" for f in data_groups[folder]
-            ]
             old_folder_path = os.path.join(args.output_folder, folder)
+            if not os.path.isdir(old_folder_path):
+                continue
             new_folder_path = old_folder_path.replace("imagesT", "labelsT")
             os.makedirs(new_folder_path, exist_ok=True)
             json_files = [
-                file
-                for file in os.listdir(old_folder_path)
-                if file.endswith(".json")
-                and any([file.startswith(fo) for fo in file_options])
+                file for file in os.listdir(old_folder_path) if file.endswith(".json")
             ]
             mask_file_names = [
-                os.path.join(new_folder_path, file.replace("_0000.json", ".png"))
+                os.path.join(new_folder_path, file.replace(".json", ".png"))
                 for file in json_files
             ]
             json_file_paths = [os.path.join(old_folder_path, file) for file in json_files]
@@ -392,20 +410,14 @@ def run(args):
             if file.endswith(".png")
         ]
     )
-    num_validation_data = len(
-        [
-            file
-            for file in os.listdir(os.path.join(args.output_folder, "imagesTv"))
-            if file.endswith(".png")
-        ]
-    )
-    num_test_data = len(
-        [
-            file
-            for file in os.listdir(os.path.join(args.output_folder, "imagesTs"))
-            if file.endswith(".png")
-        ]
-    )
+    num_validation_data = 0
+    num_test_data = 0
+    imagesTv_path = os.path.join(args.output_folder, "imagesTv")
+    imagesTs_path = os.path.join(args.output_folder, "imagesTs")
+    if os.path.isdir(imagesTv_path):
+        num_validation_data = len([f for f in os.listdir(imagesTv_path) if f.endswith(".png")])
+    if os.path.isdir(imagesTs_path):
+        num_test_data = len([f for f in os.listdir(imagesTs_path) if f.endswith(".png")])
     print(f"Training data: {num_training_data} images")
     print(f"Validation data: {num_validation_data} images")
     print(f"Test data: {num_test_data} images")

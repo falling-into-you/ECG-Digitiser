@@ -11,10 +11,10 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 # ============ 参数配置（按需修改）============
 # 数据集列表：前缀:路径
 DATASETS=(
-    "clean:/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/nnUNet/12x1_clean"
-    "aug:/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/nnUNet/12x1_aug"
+    "clean:/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/nnUNet_raw/Dataset500_MIMIC_Clean"
+    "aug:/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/nnUNet_raw/Dataset500_MIMIC_Aug"
 )
-OUTPUT_DIR="<合并后的 nnUNet 数据集路径，如 /data/nnUNet_raw/Dataset500_Signals>"
+OUTPUT_DIR="/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/nnUNet_raw/Dataset500_MIMIC"
 # =============================================
 
 mkdir -p "$OUTPUT_DIR/imagesTr"

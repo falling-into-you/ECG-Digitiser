@@ -8,42 +8,44 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$PROJECT_ROOT"
 
 # ============ 参数配置（按需修改）============
-IMAGE_DIR="<生成图像目录，如 /data/ecg_images/12x1_clean>"
-OUTPUT_DIR="<nnUNet数据集输出路径，如 /data/nnUNet_raw/Dataset500_Signals>"
-SPLIT_CSV=""  # 可选，train/val/test 划分用的 CSV，留空则不划分
-NUM_WORKERS=64
+IMAGE_DIR="/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/12x1_clean_10w"
+OUTPUT_DIR="/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/nnUNet_raw/Dataset500_MIMIC_Clean"
+SPLIT_CSV=""  # PTB-XL 划分 CSV，留空则全部作为训练集（--no_split）
+NUM_WORKERS=128
 RESAMPLE_FACTOR=2  # 像素插值倍数
 # =============================================
 
-echo "============================="
-echo "步骤 1/2: 像素坐标加密"
-echo "============================="
+# echo "============================="
+# echo "步骤 1/2: 像素坐标加密"
+# echo "============================="
 
-python -m src.ptb_xl.replot_pixels \
-    --dir "$IMAGE_DIR" \
-    --resample_factor $RESAMPLE_FACTOR \
-    --run_on_subdirs \
-    --num_workers $NUM_WORKERS
+# python -m src.ptb_xl.replot_pixels \
+#     --dir "$IMAGE_DIR" \
+#     --resample_factor $RESAMPLE_FACTOR \
+#     --run_on_subdirs \
+#     --num_workers $NUM_WORKERS
 
-echo ""
-echo "============================="
-echo "步骤 2/2: 转换为 nnUNet 格式"
-echo "============================="
+# echo ""
+# echo "============================="
+# echo "步骤 2/2: 转换为 nnUNet 格式"
+# echo "============================="
 
-EXTRA_ARGS=""
+SPLIT_ARGS=""
 if [ -n "$SPLIT_CSV" ]; then
-    EXTRA_ARGS="-d $SPLIT_CSV"
+    SPLIT_ARGS="-d $SPLIT_CSV"
+else
+    SPLIT_ARGS="--no_split"
 fi
 
-python -m src.ptb_xl.create_train_test \
+python -m src.mimic.create_mimic_dataset \
     -i "$IMAGE_DIR" \
     -o "$OUTPUT_DIR" \
-    $EXTRA_ARGS \
+    $SPLIT_ARGS \
+    -m \
     --mask \
     --mask_multilabel \
     --rgba_to_rgb \
     --gray_to_rgb \
-    --rotate_image \
     --plotted_pixels_key dense_plotted_pixels \
     --num_workers $NUM_WORKERS
 
