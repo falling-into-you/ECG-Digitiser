@@ -91,15 +91,10 @@ def get_parser():
 # Function to either copy or move files
 def transfer_file(file_path, target_dir, move):
     target_path = os.path.join(target_dir, os.path.basename(file_path))
-
-    # Remove the file if it already exists
-    if os.path.exists(target_path):
-        os.remove(target_path)
-
     if move:
         shutil.move(file_path, target_dir)
     else:
-        shutil.copy(file_path, target_dir)
+        shutil.copy2(file_path, target_path)
 
 
 # Run transfer in parallel
@@ -191,22 +186,23 @@ def create_mask_from_json(
 
         # Create mask
         mask_values = LEAD_LABEL_MAPPING
-        full_mode_lead = data_dict["full_mode_lead"]
+        full_mode_lead = data_dict.get("full_mode_lead")
         for key, path_to_use in zip(keys_to_use, mask_paths_to_use):
-            # Filter for full lead
-            full_lead_length = max(
-                [
+            # Filter for full lead (skip if no full_mode_lead)
+            if full_mode_lead and full_mode_lead != "None":
+                matching = [
                     lead["end_sample"] - lead["start_sample"]
                     for lead in data_dict[key]
                     if lead["lead_name"] == full_mode_lead
                 ]
-            )
-            data_dict[key] = [
-                lead
-                for lead in data_dict[key]
-                if lead["lead_name"] != full_mode_lead
-                or lead["end_sample"] - lead["start_sample"] == full_lead_length
-            ]
+                if matching:
+                    full_lead_length = max(matching)
+                    data_dict[key] = [
+                        lead
+                        for lead in data_dict[key]
+                        if lead["lead_name"] != full_mode_lead
+                        or lead["end_sample"] - lead["start_sample"] == full_lead_length
+                    ]
 
             # Get labels
             plotted_pixels = [
@@ -226,6 +222,9 @@ def create_mask_from_json(
                 plotted_pixels = {k: mask_values[v] for k, v in plotted_pixels.items()}
             else:
                 plotted_pixels = {k: 1 for k, v in plotted_pixels.items()}
+
+            if not plotted_pixels:
+                continue
 
             # Replace mask values with correct labels
             coords, values = zip(*plotted_pixels.items())

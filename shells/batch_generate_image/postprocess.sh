@@ -46,7 +46,7 @@ python -m src.mimic.create_mimic_dataset \
     --mask_multilabel \
     --rgba_to_rgb \
     --gray_to_rgb \
-    --plotted_pixels_key dense_plotted_pixels \
+    --plotted_pixels_key plotted_pixels \
     --num_workers $NUM_WORKERS
 
 echo ""

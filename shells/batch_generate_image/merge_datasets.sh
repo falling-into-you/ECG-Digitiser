@@ -1,69 +1,83 @@
 #!/bin/bash
-# 合并多个 nnUNet 数据集（解决文件名冲突）
-# 为每个数据集的文件加前缀，合并到同一个目录
-#
+# 合并多个 nnUNet 数据集（解决文件名冲突），用 mv 移动
 # 用法: bash shells/batch_generate_image/merge_datasets.sh
 
 set -e
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$PROJECT_ROOT"
 
 # ============ 参数配置（按需修改）============
-# 数据集列表：前缀:路径
-DATASETS=(
-    "clean:/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/nnUNet_raw/Dataset500_MIMIC_Clean"
-    "aug:/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/nnUNet_raw/Dataset500_MIMIC_Aug"
-)
+CLEAN_DIR="/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/nnUNet_raw/Dataset500_MIMIC_Clean"
+AUG_DIR="/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/nnUNet_raw/Dataset500_MIMIC_Aug"
 OUTPUT_DIR="/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/nnUNet_raw/Dataset500_MIMIC"
+NUM_WORKERS=64
 # =============================================
 
-mkdir -p "$OUTPUT_DIR/imagesTr"
-mkdir -p "$OUTPUT_DIR/labelsTr"
+python3 -c "
+import json, os, shutil
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-total=0
+clean_dir = '$CLEAN_DIR'
+aug_dir = '$AUG_DIR'
+output_dir = Path('$OUTPUT_DIR')
+num_workers = $NUM_WORKERS
 
-for entry in "${DATASETS[@]}"; do
-    PREFIX="${entry%%:*}"
-    SRC_DIR="${entry#*:}"
+datasets = [
+    ('clean', clean_dir),
+    ('aug', aug_dir),
+]
 
-    echo "============================="
-    echo "合并数据集: $PREFIX"
-    echo "来源: $SRC_DIR"
-    echo "============================="
+(output_dir / 'imagesTr').mkdir(parents=True, exist_ok=True)
+(output_dir / 'labelsTr').mkdir(parents=True, exist_ok=True)
 
-    # 复制图像，加前缀
-    if [ -d "$SRC_DIR/imagesTr" ]; then
-        count=0
-        for f in "$SRC_DIR/imagesTr"/*_0000.png; do
-            [ -f "$f" ] || continue
-            basename=$(basename "$f")
-            cp "$f" "$OUTPUT_DIR/imagesTr/${PREFIX}_${basename}"
-            count=$((count + 1))
-        done
-        echo "  imagesTr: $count 个文件"
-        total=$((total + count))
-    fi
+def move_file(args):
+    src, dst = args
+    shutil.move(str(src), str(dst))
+    return True
 
-    # 复制标签，加前缀
-    if [ -d "$SRC_DIR/labelsTr" ]; then
-        count=0
-        for f in "$SRC_DIR/labelsTr"/*.png; do
-            [ -f "$f" ] || continue
-            basename=$(basename "$f")
-            cp "$f" "$OUTPUT_DIR/labelsTr/${PREFIX}_${basename}"
-            count=$((count + 1))
-        done
-        echo "  labelsTr: $count 个文件"
-    fi
+total = 0
+for prefix, src_dir in datasets:
+    src = Path(src_dir)
+    print(f'=============================')
+    print(f'合并数据集: {prefix}')
+    print(f'来源: {src_dir}')
+    print(f'=============================')
 
-    echo ""
-done
+    tasks = []
 
-# 生成 dataset.json
-python -c "
-import json, os
+    # imagesTr
+    img_dir = src / 'imagesTr'
+    if img_dir.is_dir():
+        for f in img_dir.iterdir():
+            if f.is_file():
+                tasks.append((f, output_dir / 'imagesTr' / f'{prefix}_{f.name}'))
+        img_count = len([t for t in tasks])
+        print(f'  imagesTr: {img_count} 个文件')
 
-images = [f.replace('_0000.png', '') for f in os.listdir('$OUTPUT_DIR/imagesTr') if f.endswith('_0000.png')]
+    # labelsTr
+    lbl_dir = src / 'labelsTr'
+    lbl_count = 0
+    if lbl_dir.is_dir():
+        for f in lbl_dir.iterdir():
+            if f.is_file():
+                tasks.append((f, output_dir / 'labelsTr' / f'{prefix}_{f.name}'))
+                lbl_count += 1
+        print(f'  labelsTr: {lbl_count} 个文件')
+
+    # 多线程移动
+    from tqdm import tqdm
+    with ThreadPoolExecutor(max_workers=num_workers) as pool:
+        futures = [pool.submit(move_file, t) for t in tasks]
+        for f in tqdm(futures, total=len(futures), desc=f'Moving {prefix}', mininterval=1.0):
+            f.result()
+
+    total += len(tasks)
+    print()
+
+# dataset.json
+images = sorted([f for f in os.listdir(output_dir / 'imagesTr') if f.endswith('.png')])
 dataset = {
     'channel_names': {'0': 'Signals'},
     'labels': {
@@ -76,16 +90,14 @@ dataset = {
     'numTraining': len(images),
     'file_ending': '.png'
 }
-with open('$OUTPUT_DIR/dataset.json', 'w') as f:
+with open(output_dir / 'dataset.json', 'w') as f:
     json.dump(dataset, f, indent=4)
-print(f'dataset.json: numTraining={len(images)}')
-"
 
-echo "============================="
-echo "合并完成!"
-echo "输出: $OUTPUT_DIR"
-echo "总样本数: $total"
-echo ""
-echo "imagesTr/: $(ls "$OUTPUT_DIR/imagesTr/" | wc -l) 个文件"
-echo "labelsTr/: $(ls "$OUTPUT_DIR/labelsTr/" | wc -l) 个文件"
-echo "============================="
+print(f'=============================')
+print(f'合并完成!')
+print(f'输出: {output_dir}')
+print(f'总样本数: {len(images)}')
+print(f'imagesTr/: {len(os.listdir(output_dir / \"imagesTr\"))} 个文件')
+print(f'labelsTr/: {len(os.listdir(output_dir / \"labelsTr\"))} 个文件')
+print(f'=============================')
+"

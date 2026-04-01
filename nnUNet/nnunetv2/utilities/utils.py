@@ -41,10 +41,23 @@ def create_lists_from_splitted_dataset_folder(folder: str, file_ending: str, ide
     if identifiers is None:
         identifiers = get_identifiers_from_splitted_dataset_folder(folder, file_ending)
     files = subfiles(folder, suffix=file_ending, join=False, sort=True)
-    list_of_lists = []
-    for f in identifiers:
-        p = re.compile(re.escape(f) + r"_\d\d\d\d" + re.escape(file_ending))
-        list_of_lists.append([join(folder, i) for i in files if p.fullmatch(i)])
+    # Build a lookup dict for O(1) matching instead of O(n²) regex
+    # Expected pattern: {identifier}_{4-digit-channel}{file_ending}
+    id_set = set(identifiers)
+    file_map = {}
+    for f in files:
+        if f.endswith(file_ending):
+            stem = f[:-len(file_ending)]
+            # Try to find the last _XXXX pattern
+            last_underscore = stem.rfind('_')
+            if last_underscore > 0:
+                candidate_id = stem[:last_underscore]
+                suffix = stem[last_underscore + 1:]
+                if candidate_id in id_set and len(suffix) == 4 and suffix.isdigit():
+                    if candidate_id not in file_map:
+                        file_map[candidate_id] = []
+                    file_map[candidate_id].append(join(folder, f))
+    list_of_lists = [file_map.get(i, []) for i in identifiers]
     return list_of_lists
 
 

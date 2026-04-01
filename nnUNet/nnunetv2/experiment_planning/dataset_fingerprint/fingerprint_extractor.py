@@ -128,7 +128,7 @@ class DatasetFingerprintExtractor(object):
                                                   len(self.dataset))
 
             r = []
-            with multiprocessing.get_context("spawn").Pool(self.num_processes) as p:
+            with multiprocessing.get_context("fork").Pool(self.num_processes) as p:
                 for k in self.dataset.keys():
                     r.append(p.starmap_async(DatasetFingerprintExtractor.analyze_case,
                                              ((self.dataset[k]['images'], self.dataset[k]['label'], reader_writer_class,

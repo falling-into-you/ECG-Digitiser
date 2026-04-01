@@ -84,6 +84,10 @@ Stored in `models/M1/` and `models/M3/` via Git LFS. Contains nnUNet checkpoint 
 conda activate ecgdig
 NOT conda run
 
+## Safety Rules
+
+- **禁止执行删除操作**（rm、unlink、os.remove、shutil.rmtree 等）。需要删除文件时，必须把完整的删除命令发给用户，由用户手动执行。这包括但不限于：清理坏样本、删除临时文件、清空目录等任何涉及文件删除的场景。
+
 ## Script Conventions
 
 - All shell scripts put **every parameter inside the script** as variables at the top (in a `参数配置` section), not as command-line arguments. Users edit the script to change parameters, then run with no arguments: `bash shells/xxx.sh`.

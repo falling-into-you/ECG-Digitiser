@@ -5,10 +5,11 @@
 set -e
 
 # ============ 参数配置（按需修改）============
-export nnUNet_raw="<nnUNet_raw路径，包含 Dataset500_Signals 的父目录>"
-export nnUNet_preprocessed="<预处理输出路径>"
-export nnUNet_results="<训练结果路径>"
+export nnUNet_raw="/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/nnUNet_raw"
+export nnUNet_preprocessed="/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/nnUNet_preprocessed"
+export nnUNet_results="/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/nnUNet_results"
 DATASET_ID=500
+NUM_PROC=128
 # =============================================
 
 echo "============================="
@@ -23,7 +24,8 @@ nnUNetv2_plan_and_preprocess \
     -d $DATASET_ID \
     --clean \
     -c 2d \
-    --verify_dataset_integrity
+    -np $NUM_PROC \
+    # --verify_dataset_integrity \
 
 echo ""
 echo "============================="
