@@ -1,8 +1,6 @@
 #!/bin/bash
 # nnUNet 训练
-# 用法: bash shells/train/02_train.sh [fold] [device]
-#   fold:   训练折数，默认 0；用 all 表示全量训练
-#   device: cuda 或 cpu，默认 cuda
+# 用法: bash shells/train/02_train.sh
 
 set -e
 
@@ -11,8 +9,8 @@ export nnUNet_raw="<nnUNet_raw路径>"
 export nnUNet_preprocessed="<预处理输出路径>"
 export nnUNet_results="<训练结果路径>"
 DATASET_ID=500
-FOLD="${1:-0}"
-DEVICE="${2:-cuda}"
+FOLD=0          # 0-4 为交叉验证某一折，all 为全量训练
+DEVICE=cuda     # cuda 或 cpu
 # =============================================
 
 echo "============================="

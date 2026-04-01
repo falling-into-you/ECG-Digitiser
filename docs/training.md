@@ -78,13 +78,15 @@ bash shells/train/01_preprocess.sh
 ### 3.2 训练 (02_train.sh)
 
 ```bash
-bash shells/train/02_train.sh [fold] [device]
+bash shells/train/02_train.sh
 ```
 
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| `fold` | `0` | 训练折数：`0-4` 为五折交叉验证的某一折；`all` 使用全部数据训练（无验证集） |
-| `device` | `cuda` | 训练设备：`cuda` 或 `cpu` |
+在脚本顶部配置：
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `FOLD` | `0` | 训练折数：`0-4` 为五折交叉验证的某一折；`all` 使用全部数据训练（无验证集） |
+| `DEVICE` | `cuda` | 训练设备：`cuda` 或 `cpu` |
 
 执行 `nnUNetv2_train`，参数说明：
 
@@ -142,20 +144,17 @@ bash shells/train/03_find_best.sh
 ### 3.4 推理预测 (04_predict.sh)
 
 ```bash
-bash shells/train/04_predict.sh [fold]
+bash shells/train/04_predict.sh
 ```
 
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| `fold` | `all` | 使用哪个 fold 的模型 |
+在脚本顶部配置：
 
-脚本顶部还需要配置：
-
-| 配置项 | 含义 |
-|--------|------|
-| `INPUT_DIR` | 待预测图像目录（PNG 格式，文件名需含 `_0000` 后缀）|
-| `OUTPUT_DIR` | 预测结果输出目录（输出 mask PNG）|
-| `DEVICE` | `cuda` 或 `cpu` |
+| 配置项 | 默认值 | 含义 |
+|--------|--------|------|
+| `FOLD` | `all` | 使用哪个 fold 的模型 |
+| `INPUT_DIR` | — | 待预测图像目录（PNG 格式，文件名需含 `_0000` 后缀）|
+| `OUTPUT_DIR` | — | 预测结果输出目录（输出 mask PNG）|
+| `DEVICE` | `cuda` | `cuda` 或 `cpu` |
 
 输入图像命名要求：`xxx_0000.png`（跟 nnUNet 训练格式一致）。
 

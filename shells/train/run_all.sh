@@ -9,7 +9,7 @@ export nnUNet_raw="<nnUNet_raw路径>"
 export nnUNet_preprocessed="<预处理输出路径>"
 export nnUNet_results="<训练结果路径>"
 DATASET_ID=500
-DEVICE="cuda"  # cuda 或 cpu
+DEVICE=cuda     # cuda 或 cpu
 # =============================================
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -26,7 +26,7 @@ bash "$SCRIPT_DIR/01_preprocess.sh"
 
 echo ""
 echo ">>> [2/3] 训练 (fold=all, 使用全部数据)"
-bash "$SCRIPT_DIR/02_train.sh" all $DEVICE
+bash "$SCRIPT_DIR/02_train.sh"
 
 echo ""
 echo ">>> [3/3] 查找最佳配置"

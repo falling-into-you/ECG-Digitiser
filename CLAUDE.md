@@ -83,3 +83,8 @@ Stored in `models/M1/` and `models/M3/` via Git LFS. Contains nnUNet checkpoint 
 ## Conda Environment
 conda activate ecgdig
 NOT conda run
+
+## Script Conventions
+
+- All shell scripts put **every parameter inside the script** as variables at the top (in a `参数配置` section), not as command-line arguments. Users edit the script to change parameters, then run with no arguments: `bash shells/xxx.sh`.
+- Do NOT use positional arguments (`$1`, `$2`) or `--flag` parsing in shell scripts.

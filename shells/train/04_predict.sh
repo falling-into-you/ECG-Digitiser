@@ -1,7 +1,6 @@
 #!/bin/bash
 # nnUNet 推理预测
-# 用法: bash shells/train/04_predict.sh [fold]
-#   fold: 使用哪个 fold 的模型，默认 all
+# 用法: bash shells/train/04_predict.sh
 
 set -e
 
@@ -10,10 +9,10 @@ export nnUNet_raw="<nnUNet_raw路径>"
 export nnUNet_preprocessed="<预处理输出路径>"
 export nnUNet_results="<训练结果路径>"
 DATASET_ID=500
-FOLD="${1:-all}"
+FOLD=all                    # 使用哪个 fold 的模型
 INPUT_DIR="<待预测图像目录>"
 OUTPUT_DIR="<预测结果输出目录>"
-DEVICE="cuda"  # cuda 或 cpu
+DEVICE=cuda                 # cuda 或 cpu
 # =============================================
 
 mkdir -p "$OUTPUT_DIR"
