@@ -9,18 +9,23 @@
 ## 1. 整体流程
 
 ```
-ecg-image-generator 输出
-│  ├── record-0.png          (ECG 图像)
-│  └── record-0.json         (含 plotted_pixels, 每导联仅采样点数个坐标)
+ecg-image-generator 输出（clean + aug 两个目录）
+│  ├── record-0.png
+│  └── record-0.json
 │
-├─ [步骤1] replot_pixels.py ──→ JSON 中增加 dense_plotted_pixels (插值加密)
+├─ [步骤1] postprocess.sh (分别对 clean 和 aug 各跑一次)
+│     ├── replot_pixels.py     → JSON 中增加 dense_plotted_pixels
+│     └── create_train_test.py → 转成 nnUNet 目录格式
+│           ├── imagesTr/xxx_0000.png
+│           ├── labelsTr/xxx.png
+│           └── dataset.json
 │
-├─ [步骤2] create_train_test.py ──→ 转成 nnUNet 目录格式
-│     ├── imagesTr/xxx_0000.png   (训练图像)
-│     ├── labelsTr/xxx.png        (分割 mask, 像素值=类别ID)
-│     └── dataset.json
+├─ [步骤2] merge_datasets.sh  → 加前缀合并多个数据集，避免文件名冲突
+│     ├── imagesTr/clean_xxx_0000.png + aug_xxx_0000.png
+│     ├── labelsTr/clean_xxx.png + aug_xxx.png
+│     └── dataset.json (自动重新生成)
 │
-└─ [步骤3] nnUNetv2_plan_and_preprocess ──→ 开始训练
+└─ [步骤3] 01_preprocess.sh   → nnUNet 预处理，开始训练
 ```
 
 ---
@@ -224,54 +229,73 @@ nnUNetv2_find_best_configuration 500 -c 2d --disable_ensembling
 
 ```bash
 conda activate ecgdig
-cd /projects/ECG-Digitiser
 
-# 1. 生成图像（以 12×1 为例）
-cd ecg-image-generator
-python gen_ecg_images_from_data_batch.py \
-    -i <wfdb数据目录> \
-    -o <输出目录> \
-    --config_file config_12x1.yaml \
-    --num_columns 1 \
-    --full_mode None \
-    --mask_unplotted_samples \
-    --store_config 2 \
-    --calibration_pulse 0.8 \
-    --random_bw 0.2 \
-    -rot 5 \
-    --augment -noise 40 \
-    --num_workers 8 \
-    --image_only
-cd ..
+# 1. 生成无增强图像
+bash shells/batch_generate_image/gen_12x1_clean.sh
 
-# 2. 加密像素坐标
-python -m src.ptb_xl.replot_pixels \
-    --dir <输出目录> \
-    --resample_factor 3 \
-    --run_on_subdirs \
-    --num_workers 8
+# 2. 生成有增强图像
+bash shells/batch_generate_image/gen_12x1_aug.sh
 
-# 3. 转成 nnUNet 格式
-python -m src.ptb_xl.create_train_test \
-    -i <输出目录> \
-    -d <划分csv> \
-    -o <nnUNet_raw>/Dataset500_Signals \
-    --mask --mask_multilabel \
-    --plotted_pixels_key dense_plotted_pixels \
-    --rgba_to_rgb --gray_to_rgb \
-    --num_workers 8
+# 3. 后处理无增强数据（像素加密 + 转 nnUNet 格式）
+#    修改 postprocess.sh 的 IMAGE_DIR 和 OUTPUT_DIR 指向 clean 数据
+bash shells/batch_generate_image/postprocess.sh
 
-# 4. nnUNet 预处理 + 训练
-export nnUNet_raw='<nnUNet_raw的路径>'
-export nnUNet_preprocessed='<预处理路径>'
-export nnUNet_results='<结果路径>'
-nnUNetv2_plan_and_preprocess -d 500 --clean -c 2d --verify_dataset_integrity
-nnUNetv2_train 500 2d 0 -device cuda
+# 4. 后处理有增强数据（同上，修改路径指向 aug 数据）
+bash shells/batch_generate_image/postprocess.sh
+
+# 5. 合并两个数据集（加前缀避免文件名冲突）
+bash shells/batch_generate_image/merge_datasets.sh
+
+# 6. nnUNet 预处理
+bash shells/train/01_preprocess.sh
+
+# 7. 训练
+bash shells/train/02_train.sh
+```
+
+### 合并多数据集说明
+
+无增强和有增强数据的文件名相同（如 `40792771-0_0000.png`），直接合并会冲突。`merge_datasets.sh` 通过给每个数据集的文件加前缀解决：
+
+```
+clean 数据集:  40792771-0_0000.png  →  clean_40792771-0_0000.png
+aug 数据集:    40792771-0_0000.png  →  aug_40792771-0_0000.png
+```
+
+脚本顶部配置要合并的数据集列表，格式为 `"前缀:nnUNet数据集路径"`：
+
+```bash
+DATASETS=(
+    "clean:/data/.../nnUNet/12x1_clean"
+    "aug:/data/.../nnUNet/12x1_aug"
+)
+OUTPUT_DIR="<合并后的最终数据集路径>"
+```
+
+可以添加任意多个数据集。合并后自动生成 `dataset.json`。
+
+---
+
+## 7. 脚本总览
+
+```
+shells/batch_generate_image/
+├── gen_12x1_clean.sh      # 生成无增强图像
+├── gen_12x1_aug.sh        # 生成有增强图像
+├── postprocess.sh         # 后处理：像素加密 + 转 nnUNet 格式
+└── merge_datasets.sh      # 合并多个数据集（加前缀避免文件名冲突）
+
+shells/train/
+├── 01_preprocess.sh       # nnUNet 预处理
+├── 02_train.sh            # 训练
+├── 03_find_best.sh        # 查找最佳配置
+├── 04_predict.sh          # 推理预测
+└── run_all.sh             # 一键全流程
 ```
 
 ---
 
-## 7. 常见问题
+## 8. 常见问题
 
 | 问题 | 原因 | 解决 |
 |------|------|------|
