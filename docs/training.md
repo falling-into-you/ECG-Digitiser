@@ -81,30 +81,37 @@ bash shells/train/01_preprocess.sh
 bash shells/train/02_train.sh
 ```
 
-在脚本顶部配置：
+#### 命令行参数（脚本顶部配置）
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
-| `FOLD` | `0` | 训练折数：`0-4` 为五折交叉验证的某一折；`all` 使用全部数据训练（无验证集） |
-| `DEVICE` | `cuda` | 训练设备：`cuda` 或 `cpu` |
+| `FOLD` | `0` | `0-9` 为 10 折中某一折（90% 训练 + 10% 验证）；`all` 全量训练无验证 |
+| `DEVICE` | `cuda` | 训练设备：`cuda` / `cpu` / `mps` |
+| `NUM_GPUS` | `1` | 多 GPU 训练时的 GPU 数量 |
+| `PRETRAINED` | 空 | 预训练权重路径（迁移学习），留空从头训练 |
+| `CONTINUE` | `true` | 断点续训——中断后重新执行从最近 checkpoint 恢复 |
+| `SAVE_SOFTMAX` | `false` | 保存 softmax 预测（模型集成时需要） |
+| `USE_COMPRESSED` | `false` | 读压缩数据（省存储但耗 CPU） |
 
-执行 `nnUNetv2_train`，参数说明：
+#### 模型超参（需改源码）
 
-| 参数 | 含义 |
-|------|------|
-| `500` | 数据集 ID |
-| `2d` | 使用 2D 网络配置 |
-| `$FOLD` | 折数 |
-| `-device` | 训练设备 |
-| `--c` | 支持断点续训——中断后重新执行会从最近的 checkpoint 继续 |
+以下参数位于 `nnUNet/nnunetv2/training/nnUNetTrainer/nnUNetTrainer.py` 的 `__init__` 中。修改后需重新安装：`cd nnUNet && pip install . && cd ..`
 
-#### Fold 选择策略
+| 超参 | 默认值 | 说明 |
+|------|--------|------|
+| `initial_lr` | `1e-2` | 初始学习率 |
+| `weight_decay` | `3e-5` | 权重衰减（L2 正则化） |
+| `num_epochs` | `500` | 总训练轮数 |
+| `num_iterations_per_epoch` | `250` | 每轮训练迭代次数（每轮看到 250 × batch_size 个样本） |
+| `num_val_iterations_per_epoch` | `50` | 每轮验证迭代次数 |
+| `oversample_foreground_percent` | `0.33` | 前景过采样比例（33% 的 batch 保证包含前景像素，应对背景占 97% 的不平衡） |
+| `enable_deep_supervision` | `True` | 深度监督（中间层也计算 loss，帮助梯度传播） |
+| `save_every` | `50` | 每 N 轮保存一次中间 checkpoint |
 
-| 场景 | 推荐 fold | 说明 |
-|------|----------|------|
-| 快速验证 | `0` | 用 fold 0 训练，其余做验证，快速看效果 |
-| 正式评估 | `0` `1` `2` `3` `4` | 五折全训，交叉验证评估性能 |
-| 最终部署 | `all` | 用全部数据训练，得到最强模型（无验证集）|
+固定设置（不建议改）：
+- **优化器**：SGD（momentum=0.99, nesterov=True）
+- **学习率调度**：PolyLR（多项式衰减，从 initial_lr 衰减到 0）
+- **数据划分**：10 折，seed=42
 
 #### 多 GPU 训练
 
