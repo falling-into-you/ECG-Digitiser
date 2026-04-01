@@ -7,8 +7,8 @@ set -e
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
 # ============ 参数配置（按需修改）============
-INPUT_DIR="<MIMIC-IV-ECG数据集路径，如 /data/mimic-iv-ecg/files>"
-OUTPUT_DIR="<输出路径，如 /data/ecg_images/12x1_aug>"
+INPUT_DIR="/data/jinjiarui/datasets/ECG_R1_Dataset/ecg_timeseries/mimic-iv/files"
+OUTPUT_DIR="/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/12x1_aug_10w"
 SAMPLE_COUNT=100000
 SEED=42
 NUM_WORKERS=64

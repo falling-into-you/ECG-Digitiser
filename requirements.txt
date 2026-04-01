@@ -7,7 +7,6 @@ joblib==1.4.0
 keras==2.14.0
 librosa>=0.10.2
 matplotlib==3.8.4
-numpy==1.26.4
 opencv-python==4.9.0.80
 pandas==2.2.2
 pillow==10.3.0
@@ -28,3 +27,4 @@ torchvision>=0.17.0
 tqdm==4.66.1
 validators==0.18.2
 wfdb==4.1.2
+numpy==1.26.4
