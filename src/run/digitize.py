@@ -72,6 +72,13 @@ def get_parser():
         default=False,
         help="Allow failures.",
     )
+    parser.add_argument(
+        "--save_intermediates",
+        action="store_true",
+        default=False,
+        help="Save intermediate results: rotated image, raw mask, "
+             "per-lead binary masks, and overlay visualization.",
+    )
     return parser
 
 
@@ -271,6 +278,69 @@ def vectorise(
     return predicted_signal_sampled
 
 
+def save_intermediates(
+    record, output_folder, image_rotated, mask_to_use,
+    signal_masks_cropped, signal_positions_cropped,
+):
+    """保存 UNet 分割的中间结果。
+
+    输出到 <output_folder>/intermediates/<record>/:
+      - rotated.png          旋转校正后的输入图像
+      - mask_raw.png         nnUNet 原始多类别 mask (像素值=类别ID)
+      - mask_color.png       mask 彩色可视化
+      - mask_overlay.png     mask 叠加在原图上的可视化
+      - lead_<name>.png      每个导联的二值 mask
+    """
+    inter_dir = os.path.join(output_folder, "intermediates", record)
+    os.makedirs(inter_dir, exist_ok=True)
+
+    # 1) 旋转后的原图
+    write_png(image_rotated, os.path.join(inter_dir, "rotated.png"))
+
+    # 2) 原始 mask (单通道, 像素值=类别ID 0-12)
+    write_png(mask_to_use, os.path.join(inter_dir, "mask_raw.png"))
+
+    # 3) mask 彩色可视化 + overlay
+    mask_np = mask_to_use[0].numpy().astype(np.uint8)
+    n_classes = int(mask_np.max()) + 1
+
+    # 生成颜色映射 (类别0=背景透明, 1-12=不同颜色)
+    cmap = plt.colormaps["tab20"]
+    color_mask = np.zeros((*mask_np.shape, 3), dtype=np.uint8)
+    for c in range(1, n_classes):
+        rgba = cmap(c / max(n_classes, 1))
+        color_mask[mask_np == c] = [
+            int(rgba[0] * 255), int(rgba[1] * 255), int(rgba[2] * 255)
+        ]
+    from PIL import Image as PILImage
+    PILImage.fromarray(color_mask).save(
+        os.path.join(inter_dir, "mask_color.png")
+    )
+
+    # overlay: 原图 + 半透明 mask
+    img_np = image_rotated.permute(1, 2, 0).numpy().astype(np.uint8)
+    overlay = img_np.copy()
+    fg = mask_np > 0
+    overlay[fg] = (
+        overlay[fg].astype(np.float32) * 0.5
+        + color_mask[fg].astype(np.float32) * 0.5
+    ).astype(np.uint8)
+    PILImage.fromarray(overlay).save(
+        os.path.join(inter_dir, "mask_overlay.png")
+    )
+
+    # 4) 每个导联的二值 mask
+    for lead_name, mask in signal_masks_cropped.items():
+        if mask is not None:
+            # mask shape: (1, H, W), 值 0/1 -> 0/255 方便查看
+            lead_vis = (mask[0].numpy() * 255).astype(np.uint8)
+            PILImage.fromarray(lead_vis).save(
+                os.path.join(inter_dir, f"lead_{lead_name}.png")
+            )
+
+    print(f"  中间结果已保存到: {inter_dir}")
+
+
 def save_plot_masks_and_signals(
     image, masks_cropped, mask_start_position, signals, sig_names, output_folder, filename="record.png"
 ):
@@ -358,6 +428,13 @@ def run(args):
         signal_masks_cropped, signal_positions_cropped, _ = cut_binary(
             mask_to_use, image_rotated
         )
+
+        # Save intermediate results if requested
+        if args.save_intermediates:
+            save_intermediates(
+                record, args.output_folder, image_rotated, mask_to_use,
+                signal_masks_cropped, signal_positions_cropped,
+            )
 
         # Vecotrise
         x_pixel_list = [
