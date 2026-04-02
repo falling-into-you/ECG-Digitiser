@@ -294,3 +294,70 @@ export nnUNet_results="/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/nnUNet
 | 图像和标签不配对 | 缺少 `_0000` 后缀 | 跑 `prepare_nnunet.sh` |
 | 文件名冲突 | clean 和 aug 有同名文件 | `merge_datasets.sh` 会自动加前缀 |
 | 预处理卡住 | 200k 样本 + spawn 模式 | 已修复：fork 模式 + O(n) 文件匹配 |
+| `IndexError: boolean index did not match` | image RGB (3通道) 但 mask 单通道 (L) | **mask 必须也是 3 通道 RGB**，见下方说明 |
+| `assert data.shape[1:] == seg.shape[1:]` | 同上，nnUNet 要求 image 和 seg 通道数一致 | 同上 |
+
+---
+
+## 8. 关键：mask 必须是 RGB 3通道
+
+nnUNet 使用 `NaturalImage2DIO` 读取 RGB 图片时，返回 shape `(1, 3, H, W)`。预处理阶段有硬断言：
+
+```python
+assert data.shape[1:] == seg.shape[1:]
+# (3, H, W) != (1, H, W) → 崩溃
+```
+
+**image 和 mask 必须都是 RGB 3通道**，否则预处理会在以下位置崩溃：
+
+1. `crop_to_nonzero` — boolean index 维度不匹配
+2. `collect_foreground_intensities` — boolean index 维度不匹配
+3. `default_preprocessor.py:46` — shape assert 失败
+4. resampling — mask 通道数被错误插值
+
+### generate_masks.sh 必须加 --gray_to_rgb
+
+```bash
+python3 -m src.mimic.generate_masks \
+    -i "$INPUT_DIR" \
+    --mask_multilabel \
+    --gray_to_rgb \          # ← 必须！让 mask 也变成 3 通道
+    --plotted_pixels_key plotted_pixels \
+    --num_workers $NUM_WORKERS
+```
+
+`create_mimic_dataset.py` 中 `--gray_to_rgb` 会自动将 mask 从 `(H, W)` 扩展为 `(H, W, 3)` 再保存为 RGB PNG。
+
+### 如果 mask 已经是单通道 L 模式
+
+可以用以下命令批量转换（128 进程，约 4 分钟处理 18 万文件）：
+
+```python
+from PIL import Image
+from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor
+
+labels_dir = Path('labelsTr路径')
+
+def convert_mask(f):
+    img = Image.open(f)
+    if img.mode == 'L':
+        img = img.convert('RGB')
+        img.save(f)
+
+files = list(labels_dir.glob('*.png'))
+with ProcessPoolExecutor(max_workers=64) as ex:
+    list(ex.map(convert_mask, files))
+```
+
+### 验证方法
+
+```bash
+python3 -c "
+from PIL import Image
+img = Image.open('imagesTr/xxx_0000.png')
+mask = Image.open('labelsTr/xxx.png')
+print(f'image: {img.mode}, mask: {mask.mode}')
+# 两个都应该是 RGB
+"
+```
