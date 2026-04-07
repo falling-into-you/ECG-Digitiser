@@ -8,10 +8,10 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$PROJECT_ROOT"
 
 # ============ 参数配置（按需修改）============
-IMAGE_DIR="/mnt/data/jiaruijin/datasets/ECG-Digital-Dataset/mimic/12x1_clean_2w"
-OUTPUT_DIR="/mnt/data/jiaruijin/datasets/ECG-Digital-Dataset/mimic/nnUNet_raw/Dataset500_MIMIC_Clean"
+IMAGE_DIR="/mnt/data/jiaruijin/datasets/ECG-Digital-Dataset/mimic/12x1_aug_2w"
+OUTPUT_DIR="/mnt/data/jiaruijin/datasets/ECG-Digital-Dataset/mimic/nnUNet_raw/Dataset500_MIMIC_Aug"
 SPLIT_CSV=""  # PTB-XL 划分 CSV，留空则全部作为训练集（--no_split）
-NUM_WORKERS=128
+NUM_WORKERS=64
 RESAMPLE_FACTOR=3  # 像素插值倍数
 # =============================================
 
@@ -41,7 +41,6 @@ python -m src.mimic.create_mimic_dataset \
     -i "$IMAGE_DIR" \
     -o "$OUTPUT_DIR" \
     $SPLIT_ARGS \
-    -m \
     --mask \
     --mask_multilabel \
     --rgba_to_rgb \

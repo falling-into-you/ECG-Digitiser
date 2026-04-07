@@ -18,10 +18,11 @@ import glob
 import os
 import shutil
 import sys
+from functools import partial
 import pandas as pd
 from PIL import Image
 from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 
 from src.utils.helper_code import *
 from config import LEAD_LABEL_MAPPING
@@ -243,6 +244,15 @@ def create_mask_from_json(
         print(f"--------- ERROR IN {json_path} --------- {e} ---------")
 
 
+# Top-level worker function for ProcessPoolExecutor (must be picklable)
+def _create_mask_worker(json_path, mask_path, rgb=False, multilabel=False, plotted_pixels_key="plotted_pixels"):
+    try:
+        create_mask_from_json(json_path, mask_path, rgb, multilabel, plotted_pixels_key)
+        return None
+    except Exception as e:
+        return f"Error creating mask for {json_path}: {e}"
+
+
 # Create masks in parallel
 def create_mask_from_json_parallel(
     json_paths,
@@ -258,25 +268,27 @@ def create_mask_from_json_parallel(
         workers = num_workers
     print(f"Using {workers}/{os.cpu_count()} workers")
 
-    def _process(args):
-        json_path, mask_path = args
-        try:
-            create_mask_from_json(json_path, mask_path, rgb, multilabel, plotted_pixels_key)
-            return True
-        except Exception as e:
-            return f"Error creating mask for {json_path}: {e}"
+    _fn = partial(
+        _create_mask_worker,
+        rgb=rgb,
+        multilabel=multilabel,
+        plotted_pixels_key=plotted_pixels_key,
+    )
 
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(_process, pair): pair for pair in zip(json_paths, mask_paths)}
-        errors = 0
-        for future in tqdm(as_completed(futures), total=len(futures), mininterval=1.0):
-            result = future.result()
-            if result is not True:
+    errors = 0
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        for result in tqdm(
+            pool.map(_fn, json_paths, mask_paths),
+            total=len(json_paths),
+            desc="Creating masks",
+            mininterval=1.0,
+        ):
+            if result is not None:
                 errors += 1
                 if errors <= 10:
                     print(result)
-        if errors > 10:
-            print(f"... 共 {errors} 个 mask 创建失败")
+    if errors > 10:
+        print(f"... 共 {errors} 个 mask 创建失败")
 
 
 # Run the code.
