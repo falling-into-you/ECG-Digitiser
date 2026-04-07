@@ -6,7 +6,7 @@
 set -e
 
 # ============ 参数配置（按需修改）============
-TARGET_DIR="/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/12x1_aug_10w"
+TARGET_DIR="/mnt/data/jiaruijin/datasets/ECG-Digital-Dataset/mimic/12x1_clean_2w"
 # ============================================
 
 if [ ! -d "$TARGET_DIR" ]; then

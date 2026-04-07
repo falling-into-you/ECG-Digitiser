@@ -100,4 +100,11 @@ print(f'总样本数: {len(images)}')
 print(f'imagesTr/: {len(os.listdir(output_dir / \"imagesTr\"))} 个文件')
 print(f'labelsTr/: {len(os.listdir(output_dir / \"labelsTr\"))} 个文件')
 print(f'=============================')
+
+# 清理源数据集目录，避免 nnUNet 发现多个 Dataset500_* 导致 ID 冲突
+import shutil as _shutil
+for _, src_dir in datasets:
+    if os.path.isdir(src_dir) and os.path.abspath(src_dir) != os.path.abspath(str(output_dir)):
+        _shutil.rmtree(src_dir)
+        print(f'已清理源目录: {src_dir}')
 "

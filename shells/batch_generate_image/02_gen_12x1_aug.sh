@@ -7,9 +7,9 @@ set -e
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
 # ============ 参数配置（按需修改）============
-INPUT_DIR="/data/jinjiarui/datasets/ECG_R1_Dataset/ecg_timeseries/mimic-iv/files"
-OUTPUT_DIR="/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/12x1_aug_10w"
-SAMPLE_COUNT=100000
+INPUT_DIR="/mnt/data/jiaruijin/datasets/ECG_R1_Dataset/ecg_timeseries/mimic-iv/files"
+OUTPUT_DIR="/mnt/data/jiaruijin/datasets/ECG-Digital-Dataset/mimic/12x1_aug_2w"
+SAMPLE_COUNT=20000
 SEED=42
 NUM_WORKERS=64
 RESOLUTION=200
@@ -52,6 +52,14 @@ python gen_ecg_images_from_data_batch.py \
     --max_num_images $SAMPLE_COUNT \
     --num_workers $NUM_WORKERS \
     --image_only
+
+echo ""
+echo "============================="
+echo "清理空目录..."
+echo "============================="
+EMPTY_BEFORE=$(find "$OUTPUT_DIR" -type d -empty | wc -l)
+find "$OUTPUT_DIR" -type d -empty -delete 2>/dev/null || true
+echo "已删除 $EMPTY_BEFORE 个空目录"
 
 echo ""
 echo "============================="
