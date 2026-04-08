@@ -28,7 +28,17 @@ def read_config_file(config_file):
 
     return args
 
-def find_records(folder, output_dir):
+def find_records(folder, output_dir, create_dirs=True):
+    """扫描输入目录，找到所有 WFDB 兼容的 ECG 文件
+    
+    Args:
+        folder: 输入目录路径
+        output_dir: 输出目录路径
+        create_dirs: 是否预创建目录结构（设为False可延迟到抽样后再创建）
+    
+    Returns:
+        header_files, recording_files: 头文件和数据文件的相对路径列表
+    """
     header_files = list()
     recording_files = list()
 
@@ -62,16 +72,37 @@ def find_records(folder, output_dir):
     if recording_files == []:
         raise Exception("The input directory does not have any WFDB compatible ECG files, please re-check the folder!")
 
+    # 只在 create_dirs=True 时预创建目录结构
+    if create_dirs:
+        for file in recording_files:
+            f, ext = os.path.splitext(file)
+            f1 = f.split('/')[:-1]
+            f1 = '/'.join(f1)
 
+            if os.path.exists(os.path.join(output_dir, f1)) == False:
+                os.makedirs(os.path.join(output_dir, f1))
+
+    return header_files, recording_files
+
+
+def create_output_dirs_for_files(recording_files, output_dir):
+    """为指定的文件列表创建输出目录结构
+    
+    Args:
+        recording_files: 数据文件的相对路径列表
+        output_dir: 输出目录路径
+    """
+    created_dirs = set()
     for file in recording_files:
         f, ext = os.path.splitext(file)
         f1 = f.split('/')[:-1]
         f1 = '/'.join(f1)
-
-        if os.path.exists(os.path.join(output_dir, f1)) == False:
-            os.makedirs(os.path.join(output_dir, f1))
-
-    return header_files, recording_files
+        
+        if f1 and f1 not in created_dirs:
+            dir_path = os.path.join(output_dir, f1)
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path)
+            created_dirs.add(f1)
 
 
 def find_files(data_directory):

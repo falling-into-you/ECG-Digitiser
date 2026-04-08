@@ -47,6 +47,34 @@ nnUNetv2_train 500 2d 0 -device cuda
 nnUNetv2_find_best_configuration 500 -c 2d --disable_ensembling
 ```
 
+### nnUNet Training Parameters
+
+训练参数需要直接修改 nnUNet 源码（本项目使用嵌入式 fork）：
+
+| 参数 | 文件位置 | 变量名 | 默认值 |
+|------|----------|--------|--------|
+| **epochs** | `nnUNet/nnunetv2/training/nnUNetTrainer/nnUNetTrainer.py:152` | `self.num_epochs` | 1000 |
+| **batch_size** | `nnUNet/nnunetv2/experiment_planning/experiment_planners/default_experiment_planner.py:63` | `self.UNet_min_batch_size` | 32 |
+
+**注意**：
+- `batch_size` 在 plan 生成时确定，修改后需重新运行 `nnUNetv2_plan_and_preprocess`
+- 已生成的 `nnUNetPlans.json` 中的 `batch_size` 也可直接修改，但仅影响当前数据集
+
+### Data Pipeline Parameters
+
+数据处理脚本参数（在 shell 脚本顶部配置）：
+
+| 脚本 | 参数 | 说明 |
+|------|------|------|
+| `02_postprocess.sh` | `RESAMPLE_FACTOR=3` | 像素插值倍数 |
+| `03_merge_datasets.sh` | `MOVE_FILES=true` | true=移动文件(省空间), false=复制 |
+| `04_validate_pairs.sh` | `--clean -y` | 自动清理不配对文件 |
+
+Python 脚本支持的关键参数：
+- `create_mimic_dataset.py -m` — 移动文件而非复制
+- `merge_datasets.py -m` — 移动文件而非复制
+- `validate_pairs.py --clean -y` — 自动清理且跳过确认
+
 ### Lint
 ```bash
 ruff check .
@@ -93,9 +121,11 @@ src/
     replot_pixels.py        — Create dense pixel masks (upsampled)
     create_train_test.py    — Split data into train/val/test in nnUNet format
   mimic/
-    create_mimic_dataset.py — Create dataset from MIMIC-IV-ECG
+    create_mimic_dataset.py — Create dataset from MIMIC-IV-ECG (-m 移动文件)
+    merge_datasets.py       — Merge multiple datasets (-m 移动文件)
     prepare_nnunet.py       — Rename files to nnUNet naming (_0000 suffix)
     generate_masks.py       — Generate segmentation masks from JSON coordinates
+    validate_pairs.py       — Validate imagesTr/labelsTr pairing (--clean -y 自动清理)
 ecg-image-generator/        — Synthetic ECG image generation (separate conda env: ecg_gen)
   gen_ecg_images_from_data_batch.py  — Main batch generator (parallel, 64+ workers)
   gen_ecg_images_from_jsonl.py       — Generate from JSONL mapping

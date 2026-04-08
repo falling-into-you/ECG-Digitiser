@@ -1,7 +1,7 @@
 import os, sys, argparse
 import random
 import csv
-from helper_functions import find_records
+from helper_functions import find_records, create_output_dirs_for_files
 from gen_ecg_image_from_data import run_single_file
 import warnings
 from tqdm import tqdm
@@ -28,8 +28,15 @@ def process_single_record(file_info):
     args.header_file = os.path.join(input_directory, header)
     args.start_index = -1
     
-    folder_struct_list = full_header_file.split('/')[:-1]
-    args.output_directory = os.path.join(original_output_dir, '/'.join(folder_struct_list))
+    # 根据 flat_output 决定输出目录
+    if args_dict.get('flat_output', False):
+        # 扁平化输出：直接放在输出目录下
+        args.output_directory = original_output_dir
+    else:
+        # 保留原始目录结构
+        folder_struct_list = full_header_file.split('/')[:-1]
+        args.output_directory = os.path.join(original_output_dir, '/'.join(folder_struct_list))
+    
     args.encoding = os.path.split(os.path.splitext(filename)[0])[1]
     
     # 确保输出目录存在
@@ -118,6 +125,10 @@ def get_parser():
     
     parser.add_argument('--num_workers',type=int,default=1, help='并行处理的进程数，默认为1（不并行）')
     parser.add_argument('--image_only',action='store_true',default=False, help='只生成PNG图像，不生成原始数据文件(.dat和.hea)')
+    parser.add_argument('--random_sample', action='store_true', default=False,
+                        help='当使用max_num_images限制数量时，随机抽样而不是取前N个')
+    parser.add_argument('--flat_output', action='store_true', default=False,
+                        help='扁平化输出，所有文件直接放在输出目录下，不保留原始目录结构')
 
     return parser
 
@@ -137,12 +148,27 @@ def run(args):
         if os.path.exists(original_output_dir) == False:
             os.makedirs(original_output_dir)
 
-        full_header_files, full_recording_files = find_records(args.input_directory, original_output_dir)
+        # 扫描文件但不预创建目录（延迟到抽样后）
+        full_header_files, full_recording_files = find_records(args.input_directory, original_output_dir, create_dirs=False)
         
         # 限制处理的文件数量
         if args.max_num_images != -1 and args.max_num_images < len(full_header_files):
-            full_header_files = full_header_files[:args.max_num_images]
-            full_recording_files = full_recording_files[:args.max_num_images]
+            if args.random_sample:
+                # 随机抽样
+                indices = list(range(len(full_header_files)))
+                random.shuffle(indices)
+                selected_indices = sorted(indices[:args.max_num_images])  # 排序保持目录结构一致性
+                full_header_files = [full_header_files[i] for i in selected_indices]
+                full_recording_files = [full_recording_files[i] for i in selected_indices]
+                print(f'随机抽样 {args.max_num_images} 个文件（从 {len(indices)} 个文件中）')
+            else:
+                # 取前N个
+                full_header_files = full_header_files[:args.max_num_images]
+                full_recording_files = full_recording_files[:args.max_num_images]
+        
+        # 抽样完成后，只为选中的文件创建目录结构（除非使用扁平化输出）
+        if not args.flat_output:
+            create_output_dirs_for_files(full_recording_files, original_output_dir)
         
         total_files = len(full_header_files)
         print(f'开始处理 {total_files} 个文件...')
@@ -316,8 +342,12 @@ def run(args):
                 args.header_file = os.path.join(args.input_directory, header)
                 args.start_index = -1
                 
-                folder_struct_list = full_header_file.split('/')[:-1]
-                args.output_directory = os.path.join(original_output_dir, '/'.join(folder_struct_list))
+                # 根据 flat_output 决定输出目录
+                if args.flat_output:
+                    args.output_directory = original_output_dir
+                else:
+                    folder_struct_list = full_header_file.split('/')[:-1]
+                    args.output_directory = os.path.join(original_output_dir, '/'.join(folder_struct_list))
                 args.encoding = os.path.split(os.path.splitext(filename)[0])[1]
                 
                 num_images = run_single_file(args)

@@ -31,7 +31,7 @@ pip install -r requirements.txt
 At the moment, the official [nnU-Net](https://github.com/felixkrones/nnUNet.git) repository contains a bug and is not working with RGB png images. Please use the following for now:
 ```bash
 cd nnUNet
-pip install .
+pip install -e .
 cd ..
 ```
 

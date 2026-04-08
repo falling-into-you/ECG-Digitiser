@@ -5,12 +5,15 @@
 set -e
 
 # ============ 参数配置（按需修改）============
-export nnUNet_raw="/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/nnUNet_raw"
-export nnUNet_preprocessed="/data/jinjiarui/datasets/ECG-Digital-Dataset/mimic/nnUNet_preprocessed"
-export nnUNet_results="$(cd "$(dirname "$0")/../.." && pwd)/nnUNet_results"
+export nnUNet_raw="/mnt/data/jiaruijin/datasets/ECG-Digital-Dataset/mimic/nnUNet_merge"
+export nnUNet_preprocessed="/mnt/data/jiaruijin/datasets/ECG-Digital-Dataset/mimic/nnUNet_preprocessed"
+export nnUNet_results="$(cd "$(dirname "$0")/../.." && pwd)/results/nnUNet"
 DATASET_ID=500
 NUM_PROC=128
 # =============================================
+
+mkdir -p "$nnUNet_preprocessed"
+mkdir -p "$nnUNet_results"
 
 echo "============================="
 echo "nnUNet 预处理"
@@ -24,8 +27,7 @@ nnUNetv2_plan_and_preprocess \
     -d $DATASET_ID \
     --clean \
     -c 2d \
-    -np $NUM_PROC \
-    # --verify_dataset_integrity \
+    -np $NUM_PROC
 
 echo ""
 echo "============================="
