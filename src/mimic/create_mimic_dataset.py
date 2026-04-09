@@ -406,7 +406,7 @@ def run(args):
             create_mask_from_json_parallel(
                 json_file_paths,
                 mask_file_names,
-                args.gray_to_rgb,
+                False,  # 标签必须是单通道灰度图，不能是 RGB
                 args.mask_multilabel,
                 args.plotted_pixels_key,
                 args.num_workers,

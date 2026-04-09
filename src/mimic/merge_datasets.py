@@ -98,29 +98,29 @@ def run(args):
 
         tasks = []
 
-        # imagesTr
+        # imagesTr (只复制 PNG，跳过 JSON)
         img_dir = src / "imagesTr"
         if img_dir.is_dir():
             img_tasks = []
             for f in img_dir.iterdir():
-                if f.is_file():
+                if f.is_file() and f.suffix.lower() == ".png":
                     img_tasks.append(
                         (f, output_dir / "imagesTr" / f"{prefix}_{f.name}", move)
                     )
             tasks.extend(img_tasks)
-            print(f"  imagesTr: {len(img_tasks)} 个文件")
+            print(f"  imagesTr: {len(img_tasks)} 个 PNG 文件")
 
-        # labelsTr
+        # labelsTr (只复制 PNG)
         lbl_dir = src / "labelsTr"
         if lbl_dir.is_dir():
             lbl_tasks = []
             for f in lbl_dir.iterdir():
-                if f.is_file():
+                if f.is_file() and f.suffix.lower() == ".png":
                     lbl_tasks.append(
                         (f, output_dir / "labelsTr" / f"{prefix}_{f.name}", move)
                     )
             tasks.extend(lbl_tasks)
-            print(f"  labelsTr: {len(lbl_tasks)} 个文件")
+            print(f"  labelsTr: {len(lbl_tasks)} 个 PNG 文件")
 
         # 多线程传输
         with ThreadPoolExecutor(max_workers=args.num_workers) as pool:

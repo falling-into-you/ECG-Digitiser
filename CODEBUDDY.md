@@ -173,3 +173,44 @@ The `ecg-image-generator/` subproject needs its own conda environment (`ecg_gen`
 ### Model Weights
 
 Stored via Git LFS in `models/M1/` and `models/M3/`. Each contains `nnUNet_results/Dataset500_Signals/nnUNetTrainer__nnUNetPlans__2d/` with checkpoint files, dataset.json, and plans.json. M3 (fold_all) is the default for inference.
+
+## 数据处理重要说明
+
+### JSON 坐标文件
+
+ecg-image-generator 生成图像时会同时生成 JSON 文件，包含：
+- `plotted_pixels`: 原始像素坐标
+- `dense_plotted_pixels`: 插值加密后的像素坐标（由 `replot_pixels.py` 生成）
+- `leads`: 每个导联的元数据（名称、采样范围、坐标）
+- 图像尺寸、采样频率、网格颜色等元信息
+
+**JSON 文件用途**：
+1. **生成分割标签** — `create_mimic_dataset.py` 和 `create_train_test.py` 读取 JSON 中的像素坐标生成标签图（labelsTr）
+2. **数据增强追踪** — 如果有 `leads_augmented` 字段，可生成增强版本的标签
+3. **调试和验证** — 可用于检查像素坐标是否正确
+
+**JSON 文件存放位置**：
+- 原始数据目录：`12x1_*/pXXXX/pXXXXXXXX/sXXXXXXXX/*.json` — **必须保留**
+- nnUNet 数据集 imagesTr：复制过来的 JSON — **不影响 nnUNet**，但占用空间
+
+**nnUNet 是否读取 JSON**：
+- nnUNet **只读取** `dataset.json` 中 `file_ending` 指定的文件格式（本项目是 `.png`）
+- imagesTr 中的 `.json` 文件会被 nnUNet **忽略**，不影响训练
+- 但会占用存储空间（40000 个 JSON ≈ 几 GB）
+
+**是否需要清理 imagesTr 中的 JSON**：
+- 如果磁盘空间充足：**不需要清理**，保留无害
+- 如果需要节省空间：可以清理，但**绝对不要清理原始数据目录的 JSON**
+
+### 标签格式要求
+
+nnUNet 对标签图（labelsTr）的格式要求：
+- **必须是单通道灰度图** (mode='L')
+- 像素值 = 类别索引 (0=背景, 1-12=各导联)
+- **不能是 RGB**（即使三通道值相同也不行）
+
+**已知 Bug（已修复）**：
+- `create_mimic_dataset.py` 和 `create_train_test.py` 的 `--gray_to_rgb` 参数
+- 这个参数本意是把灰度输入图像转 RGB，但被错误地传给了标签生成函数
+- 导致标签变成 RGB 三通道（nnUNet 无法正确处理）
+- 修复：标签生成时始终传 `rgb=False`

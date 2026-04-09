@@ -1,6 +1,6 @@
 #!/bin/bash
 # 验证 nnUNet 数据集 imagesTr / labelsTr 配对情况
-# 用法: bash shells/batch_generate_image/04_validate_pairs.sh [数据集目录]
+# 用法: bash shells/batch_generate_image/04_validate_pairs.sh
 
 set -e
 
@@ -14,3 +14,10 @@ DEFAULT_DIR="/mnt/data/jiaruijin/datasets/ECG-Digital-Dataset/mimic/nnUNet_merge
 INPUT_DIR="${1:-$DEFAULT_DIR}"
 
 python -m src.mimic.validate_pairs -i "$INPUT_DIR" --clean -y
+
+echo ""
+echo "============================="
+echo "验证完成!"
+echo ""
+echo "下一步: 运行 05_prepare_nnunet.sh 添加 _0000 后缀"
+echo "============================="
